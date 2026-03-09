@@ -6,7 +6,16 @@ export type { SecretInput } from "../config/types.secrets.js";
 export type { WizardPrompter } from "../wizard/prompts.js";
 export type { ChannelSetupAdapter } from "../channels/plugins/types.adapters.js";
 export type { ChannelSetupInput } from "../channels/plugins/types.core.js";
-export type { ChannelSetupDmPolicy } from "../channels/plugins/setup-wizard-types.js";
+export type {
+  ChannelSetupConfigureContext,
+  ChannelSetupConfiguredResult,
+  ChannelSetupDmPolicy,
+  ChannelSetupInteractiveContext,
+  ChannelSetupResult,
+  ChannelSetupStatus,
+  ChannelSetupStatusContext,
+  ChannelSetupWizardAdapter,
+} from "../channels/plugins/setup-wizard-types.js";
 export type {
   ChannelSetupWizard,
   ChannelSetupWizardAllowFromEntry,
@@ -59,3 +68,4 @@ export {
 export { createAllowlistSetupWizardProxy } from "../channels/plugins/setup-wizard-proxy.js";
 
 export { formatResolvedUnresolvedNote } from "./resolution-notes.js";
+export { promptChannelAccessConfig } from "../channels/plugins/setup-group-access.js";

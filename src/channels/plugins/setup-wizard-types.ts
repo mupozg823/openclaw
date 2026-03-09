@@ -81,8 +81,8 @@ export type ChannelSetupDmPolicy = {
   channel: ChannelId;
   policyKey: string;
   allowFromKey: string;
-  getCurrent: (cfg: OpenClawConfig) => DmPolicy;
-  setPolicy: (cfg: OpenClawConfig, policy: DmPolicy) => OpenClawConfig;
+  getCurrent: (cfg: OpenClawConfig, accountId?: string) => DmPolicy;
+  setPolicy: (cfg: OpenClawConfig, policy: DmPolicy, accountId?: string) => OpenClawConfig;
   promptAllowFrom?: (params: {
     cfg: OpenClawConfig;
     prompter: WizardPrompter;
