@@ -73,7 +73,7 @@ const AcpBindingSchema = z
     const channel = value.match.channel.trim().toLowerCase();
     if (
       channel !== "discord" &&
-      channel !== "matrix-js" &&
+      channel !== "matrix" &&
       channel !== "telegram" &&
       channel !== "feishu"
     ) {
@@ -81,7 +81,7 @@ const AcpBindingSchema = z
         code: z.ZodIssueCode.custom,
         path: ["match", "channel"],
         message:
-          'ACP bindings currently support only "discord", "matrix-js", "telegram", and "feishu" channels.',
+          'ACP bindings currently support only "discord", "matrix", "telegram", and "feishu" channels.',
       });
       return;
     }
