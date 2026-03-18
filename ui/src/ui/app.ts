@@ -484,6 +484,12 @@ export class OpenClawApp extends LitElement {
       }
     };
     document.addEventListener("keydown", this.globalKeydownHandler);
+    // Handheld touch detection: Chrome reports pointer:fine even on touch devices
+    // when a mouse/trackpad is the primary input. Use maxTouchPoints + viewport
+    // to add .handheld-touch class for CSS targeting.
+    if (navigator.maxTouchPoints > 0 && window.innerWidth <= 1366) {
+      document.documentElement.classList.add("handheld-touch");
+    }
     this.gamepad.start({
       onConfirm: () => (document.activeElement as HTMLElement)?.click(),
       onBack: () => {

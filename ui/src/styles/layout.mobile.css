@@ -640,8 +640,20 @@
 
 /* ─── ROG Ally X — Touch Target Optimization ─── */
 /* ROG Ally X: physical 1920x1080, DPI 150% → logical 1280x720
-   768px won't trigger at 1280px. Use 1366px to cover handheld + tablets */
+   pointer:coarse unreliable in Chrome (reports fine even with touch).
+   Use .handheld-touch class (set by app.ts via maxTouchPoints + viewport). */
 @media (max-width: 1366px) and (pointer: coarse) {
+  :root { font-size: 15px; }
+  .nav-item { min-height: 48px; }
+  .btn { min-height: 44px; padding: 10px 16px; }
+  .agent-chat__input-btn, .agent-chat__toolbar .btn-ghost { width: 48px; height: 48px; }
+  .chat-compose__field textarea { font-size: 16px; }
+  .shell { --shell-topbar-height: 56px; }
+  main.content { padding-bottom: 68px; }
+  * { scrollbar-width: none; }
+  *::-webkit-scrollbar { display: none; }
+}
+.handheld-touch {
   :root {
     font-size: 15px;
   }
@@ -680,41 +692,39 @@
 }
 
 @media (max-width: 1366px) and (pointer: coarse) {
-  .bottom-tabs {
-    display: flex;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 56px;
-    background: var(--chrome-strong);
-    border-top: 1px solid var(--border);
-    z-index: 80;
-    backdrop-filter: blur(12px);
-  }
-  .bottom-tab {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    min-height: 48px;
-    color: var(--muted);
-    font-size: 10px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .bottom-tab--active {
-    color: var(--accent);
-  }
-  .bottom-tab__icon {
-    width: 22px;
-    height: 22px;
-  }
-  .bottom-tab__label {
-    font-weight: 500;
-  }
+  .bottom-tabs { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 56px; background: var(--chrome-strong); border-top: 1px solid var(--border); z-index: 80; backdrop-filter: blur(12px); }
+  .bottom-tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 48px; color: var(--muted); font-size: 10px; border: none; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .bottom-tab--active { color: var(--accent); }
+  .bottom-tab__icon { width: 22px; height: 22px; }
+  .bottom-tab__label { font-weight: 500; }
+}
+.handheld-touch .bottom-tabs {
+  display: flex;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 56px;
+  background: var(--chrome-strong);
+  border-top: 1px solid var(--border);
+  z-index: 80;
+  backdrop-filter: blur(12px);
+}
+.handheld-touch .bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 48px;
+  color: var(--muted);
+  font-size: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.handheld-touch .bottom-tab--active { color: var(--accent); }
+.handheld-touch .bottom-tab__icon { width: 22px; height: 22px; }
+.handheld-touch .bottom-tab__label {
+  font-weight: 500;
 }
