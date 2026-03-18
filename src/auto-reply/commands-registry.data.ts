@@ -133,21 +133,21 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "help",
       nativeName: "help",
-      description: "Show available commands.",
+      description: "사용 가능한 명령어 보기",
       textAlias: "/help",
       category: "status",
     }),
     defineChatCommand({
       key: "commands",
       nativeName: "commands",
-      description: "List all slash commands.",
+      description: "전체 슬래시 명령어 목록",
       textAlias: "/commands",
       category: "status",
     }),
     defineChatCommand({
       key: "skill",
       nativeName: "skill",
-      description: "Run a skill by name.",
+      description: "스킬 실행 (이름 입력)",
       textAlias: "/skill",
       category: "tools",
       args: [
@@ -168,13 +168,13 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "status",
       nativeName: "status",
-      description: "Show current status.",
+      description: "시스템 상태 확인",
       textAlias: "/status",
       category: "status",
     }),
     defineChatCommand({
       key: "allowlist",
-      description: "List/add/remove allowlist entries.",
+      description: "허용 목록 관리",
       textAlias: "/allowlist",
       acceptsArgs: true,
       scope: "text",
@@ -183,7 +183,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "approve",
       nativeName: "approve",
-      description: "Approve or deny exec requests.",
+      description: "실행 요청 승인/거부",
       textAlias: "/approve",
       acceptsArgs: true,
       category: "management",
@@ -191,7 +191,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "context",
       nativeName: "context",
-      description: "Explain how context is built and used.",
+      description: "컨텍스트 구성 설명",
       textAlias: "/context",
       acceptsArgs: true,
       category: "status",
@@ -199,7 +199,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "btw",
       nativeName: "btw",
-      description: "Ask a side question without changing future session context.",
+      description: "세션 변경 없이 질문",
       textAlias: "/btw",
       acceptsArgs: true,
       category: "tools",
@@ -207,7 +207,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "export-session",
       nativeName: "export-session",
-      description: "Export current session to HTML file with full system prompt.",
+      description: "세션을 HTML로 내보내기",
       textAliases: ["/export-session", "/export"],
       acceptsArgs: true,
       category: "status",
@@ -223,7 +223,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "tts",
       nativeName: "tts",
-      description: "Control text-to-speech (TTS).",
+      description: "텍스트 음성 변환 (TTS) 제어",
       textAlias: "/tts",
       category: "media",
       args: [
@@ -266,14 +266,14 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "whoami",
       nativeName: "whoami",
-      description: "Show your sender id.",
+      description: "내 발신자 ID 확인",
       textAlias: "/whoami",
       category: "status",
     }),
     defineChatCommand({
       key: "session",
       nativeName: "session",
-      description: "Manage session-level settings (for example /session idle).",
+      description: "세션 설정 관리 (/session idle 등)",
       textAlias: "/session",
       category: "session",
       args: [
@@ -295,7 +295,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "subagents",
       nativeName: "subagents",
-      description: "List, kill, log, spawn, or steer subagent runs for this session.",
+      description: "서브에이전트 관리 (목록/실행/중지)",
       textAlias: "/subagents",
       category: "management",
       args: [
@@ -322,7 +322,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "acp",
       nativeName: "acp",
-      description: "Manage ACP sessions and runtime options.",
+      description: "ACP 세션 및 런타임 관리",
       textAlias: "/acp",
       category: "management",
       args: [
@@ -363,7 +363,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
       key: "focus",
       nativeName: "focus",
       description:
-        "Bind this thread (Discord) or topic/conversation (Telegram) to a session target.",
+        "스레드를 세션에 바인딩",
       textAlias: "/focus",
       category: "management",
       args: [
@@ -378,21 +378,21 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "unfocus",
       nativeName: "unfocus",
-      description: "Remove the current thread (Discord) or topic/conversation (Telegram) binding.",
+      description: "스레드 바인딩 해제",
       textAlias: "/unfocus",
       category: "management",
     }),
     defineChatCommand({
       key: "agents",
       nativeName: "agents",
-      description: "List thread-bound agents for this session.",
+      description: "바인딩된 에이전트 목록",
       textAlias: "/agents",
       category: "management",
     }),
     defineChatCommand({
       key: "kill",
       nativeName: "kill",
-      description: "Kill a running subagent (or all).",
+      description: "서브에이전트 종료",
       textAlias: "/kill",
       category: "management",
       args: [
@@ -407,7 +407,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "steer",
       nativeName: "steer",
-      description: "Send guidance to a running subagent.",
+      description: "서브에이전트에 지시",
       textAlias: "/steer",
       category: "management",
       args: [
@@ -427,7 +427,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "config",
       nativeName: "config",
-      description: "Show or set config values.",
+      description: "설정값 조회/변경",
       textAlias: "/config",
       category: "management",
       args: [
@@ -455,7 +455,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "mcp",
       nativeName: "mcp",
-      description: "Show or set OpenClaw MCP servers.",
+      description: "MCP 서버 관리",
       textAlias: "/mcp",
       category: "management",
       args: [
@@ -483,7 +483,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "plugins",
       nativeName: "plugins",
-      description: "List, show, enable, or disable plugins.",
+      description: "플러그인 관리",
       textAliases: ["/plugins", "/plugin"],
       category: "management",
       args: [
@@ -505,7 +505,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "debug",
       nativeName: "debug",
-      description: "Set runtime debug overrides.",
+      description: "디버그 설정",
       textAlias: "/debug",
       category: "management",
       args: [
@@ -533,7 +533,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "usage",
       nativeName: "usage",
-      description: "Usage footer or cost summary.",
+      description: "사용량 요약",
       textAlias: "/usage",
       category: "options",
       args: [
@@ -549,21 +549,21 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "stop",
       nativeName: "stop",
-      description: "Stop the current run.",
+      description: "현재 실행 중지",
       textAlias: "/stop",
       category: "session",
     }),
     defineChatCommand({
       key: "restart",
       nativeName: "restart",
-      description: "Restart OpenClaw.",
+      description: "OpenClaw 재시작",
       textAlias: "/restart",
       category: "tools",
     }),
     defineChatCommand({
       key: "activation",
       nativeName: "activation",
-      description: "Set group activation mode.",
+      description: "그룹 활성화 모드",
       textAlias: "/activation",
       category: "management",
       args: [
@@ -579,7 +579,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "send",
       nativeName: "send",
-      description: "Set send policy.",
+      description: "전송 정책 설정",
       textAlias: "/send",
       category: "management",
       args: [
@@ -595,7 +595,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "reset",
       nativeName: "reset",
-      description: "Reset the current session.",
+      description: "세션 초기화",
       textAlias: "/reset",
       acceptsArgs: true,
       category: "session",
@@ -603,7 +603,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "new",
       nativeName: "new",
-      description: "Start a new session.",
+      description: "새 세션 시작",
       textAlias: "/new",
       acceptsArgs: true,
       category: "session",
@@ -611,7 +611,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "compact",
       nativeName: "compact",
-      description: "Compact the session context.",
+      description: "세션 컨텍스트 압축",
       textAlias: "/compact",
       category: "session",
       args: [
@@ -626,7 +626,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "think",
       nativeName: "think",
-      description: "Set thinking level.",
+      description: "사고 수준 설정",
       textAlias: "/think",
       category: "options",
       args: [
@@ -642,7 +642,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "verbose",
       nativeName: "verbose",
-      description: "Toggle verbose mode.",
+      description: "상세 모드 전환",
       textAlias: "/verbose",
       category: "options",
       args: [
@@ -658,7 +658,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "fast",
       nativeName: "fast",
-      description: "Toggle fast mode.",
+      description: "빠른 모드 전환",
       textAlias: "/fast",
       category: "options",
       args: [
@@ -674,7 +674,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "reasoning",
       nativeName: "reasoning",
-      description: "Toggle reasoning visibility.",
+      description: "추론 표시 전환",
       textAlias: "/reasoning",
       category: "options",
       args: [
@@ -690,7 +690,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "elevated",
       nativeName: "elevated",
-      description: "Toggle elevated mode.",
+      description: "고급 모드 전환",
       textAlias: "/elevated",
       category: "options",
       args: [
@@ -706,7 +706,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "exec",
       nativeName: "exec",
-      description: "Set exec defaults for this session.",
+      description: "실행 기본값 설정",
       textAlias: "/exec",
       category: "options",
       args: [
@@ -740,7 +740,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "model",
       nativeName: "model",
-      description: "Show or set the model.",
+      description: "모델 조회/변경",
       textAlias: "/model",
       category: "options",
       args: [
@@ -754,7 +754,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "models",
       nativeName: "models",
-      description: "List model providers or provider models.",
+      description: "모델 프로바이더 목록",
       textAlias: "/models",
       argsParsing: "none",
       acceptsArgs: true,
@@ -763,7 +763,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "queue",
       nativeName: "queue",
-      description: "Adjust queue settings.",
+      description: "큐 설정",
       textAlias: "/queue",
       category: "options",
       args: [
