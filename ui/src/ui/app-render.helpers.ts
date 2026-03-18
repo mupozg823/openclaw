@@ -904,6 +904,7 @@ const THEME_OPTIONS: ThemeOption[] = [
   { id: "claw", label: "Claw", icon: "🦀" },
   { id: "knot", label: "Knot", icon: "🪢" },
   { id: "dash", label: "Dash", icon: "📊" },
+  { id: "rog", label: "ROG", icon: "🎮" },
 ];
 
 type ThemeModeOption = { id: ThemeMode; label: string; short: string };

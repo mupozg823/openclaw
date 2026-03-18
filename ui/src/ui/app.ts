@@ -487,9 +487,25 @@ export class OpenClawApp extends LitElement {
     // Handheld touch detection: Chrome reports pointer:fine even on touch devices
     // when a mouse/trackpad is the primary input. Use maxTouchPoints + viewport
     // to add .handheld-touch class for CSS targeting.
-    if (navigator.maxTouchPoints > 0 && window.innerWidth <= 1366) {
-      document.documentElement.classList.add("handheld-touch");
-    }
+    // Also detect on gamepad connection for devices like ROG Ally X where
+    // the screen is small but pointer may report as "fine".
+    const detectHandheld = () => {
+      const isTouch = navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.innerWidth <= 1366;
+      const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
+      if ((isTouch && isSmallScreen) || isCoarsePointer) {
+        document.documentElement.classList.add("handheld-touch");
+      }
+    };
+    detectHandheld();
+    // Re-check on resize (e.g. DPI scaling changes, external display)
+    window.addEventListener("resize", detectHandheld);
+    // Also add handheld class when gamepad is connected on small screen
+    window.addEventListener("gamepadconnected", () => {
+      if (window.innerWidth <= 1366) {
+        document.documentElement.classList.add("handheld-touch");
+      }
+    });
     this.gamepad.start({
       onConfirm: () => (document.activeElement as HTMLElement)?.click(),
       onBack: () => {
@@ -504,7 +520,13 @@ export class OpenClawApp extends LitElement {
       },
       onMic: () => {
         const micBtn = document.querySelector<HTMLElement>(".agent-chat__input-btn--mic, [data-stt-toggle]");
-        micBtn?.click();
+        if (micBtn) {
+          micBtn.click();
+        } else {
+          // Fallback: focus the chat textarea when no mic button exists
+          const textarea = document.querySelector<HTMLTextAreaElement>(".agent-chat__input textarea, .chat-compose__field textarea");
+          textarea?.focus();
+        }
       },
       onPrevTab: () => this.setTab(prevTab(this.tab)),
       onNextTab: () => this.setTab(nextTab(this.tab)),

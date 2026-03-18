@@ -27,6 +27,20 @@ export class GamepadController {
     };
     window.addEventListener("gamepadconnected", addGamepadClass, { once: true });
 
+    // Check if a gamepad is already connected (e.g. ROG Ally X built-in controller)
+    // Gamepad API requires a button press before getGamepads() returns data,
+    // but we can still prepare by checking on the next animation frame
+    const checkExistingGamepads = () => {
+      const gamepads = navigator.getGamepads();
+      for (const gp of gamepads) {
+        if (gp && gp.connected) {
+          document.body.classList.add("gamepad-active");
+          break;
+        }
+      }
+    };
+    requestAnimationFrame(checkExistingGamepads);
+
     // Remove gamepad-active on mouse/touch
     const removeGamepadClass = () => {
       document.body.classList.remove("gamepad-active");

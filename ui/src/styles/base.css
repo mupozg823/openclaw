@@ -228,6 +228,85 @@
   --primary: #2563eb;
 }
 
+/* ROG Ally X — Gaming red/black theme inspired by ASUS ROG Republic of Gamers */
+:root[data-theme="rog"] {
+  --bg: #0a0a0f;
+  --bg-accent: #0f0f18;
+  --bg-elevated: #141420;
+  --bg-hover: #1a1a2a;
+  --bg-muted: #1a1a2a;
+
+  --card: #111118;
+  --card-foreground: #e8e8ee;
+  --card-highlight: rgba(255, 255, 255, 0.03);
+  --popover: #141420;
+  --popover-foreground: #e8e8ee;
+
+  --panel: #0a0a0f;
+  --panel-strong: #141420;
+  --panel-hover: #1a1a2a;
+  --chrome: rgba(10, 10, 15, 0.97);
+  --chrome-strong: rgba(10, 10, 15, 0.99);
+
+  --text: #c8c8d0;
+  --text-strong: #f0f0f5;
+  --chat-text: #c8c8d0;
+  --muted: #555566;
+  --muted-strong: #444455;
+  --muted-foreground: #555566;
+
+  --border: #1c1c2c;
+  --border-strong: #2a2a3c;
+  --border-hover: #3a3a4c;
+  --input: #1c1c2c;
+  --ring: #ff0033;
+
+  --accent: #ff0033;
+  --accent-hover: #ff1a4a;
+  --accent-muted: #ff0033;
+  --accent-subtle: rgba(255, 0, 51, 0.12);
+  --accent-foreground: #ffffff;
+  --accent-glow: rgba(255, 0, 51, 0.25);
+  --primary: #ff0033;
+  --primary-foreground: #ffffff;
+
+  --secondary: #141420;
+  --secondary-foreground: #e8e8ee;
+  --accent-2: #00d4ff;
+  --accent-2-muted: rgba(0, 212, 255, 0.7);
+  --accent-2-subtle: rgba(0, 212, 255, 0.1);
+
+  --ok: #00e676;
+  --ok-muted: rgba(0, 230, 118, 0.75);
+  --ok-subtle: rgba(0, 230, 118, 0.08);
+  --destructive: #ff1744;
+  --destructive-foreground: #fafafa;
+  --warn: #ffab00;
+  --warn-muted: rgba(255, 171, 0, 0.75);
+  --warn-subtle: rgba(255, 171, 0, 0.08);
+  --danger: #ff1744;
+  --danger-muted: rgba(255, 23, 68, 0.75);
+  --danger-subtle: rgba(255, 23, 68, 0.08);
+  --info: #448aff;
+
+  --focus: rgba(255, 0, 51, 0.25);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 3px color-mix(in srgb, var(--ring) 70%, transparent);
+  --focus-glow: 0 0 0 2px var(--bg), 0 0 0 3px var(--ring), 0 0 20px var(--accent-glow);
+
+  --grid-line: rgba(255, 255, 255, 0.02);
+  --shadow-glow: 0 0 30px var(--accent-glow);
+}
+
+:root[data-theme="rog-light"] {
+  --ring: #cc0029;
+  --accent: #cc0029;
+  --accent-hover: #e6003a;
+  --accent-muted: #cc0029;
+  --accent-subtle: rgba(204, 0, 41, 0.1);
+  --accent-glow: rgba(204, 0, 41, 0.14);
+  --primary: #cc0029;
+}
+
 * {
   box-sizing: border-box;
 }

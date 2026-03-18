@@ -10,6 +10,7 @@ export type BottomTabsProps = {
 const BOTTOM_TABS: Array<{ id: Tab; label: string; icon: keyof typeof icons }> = [
   { id: "overview", label: "Dashboard", icon: "barChart" },
   { id: "chat", label: "Chat", icon: "messageSquare" },
+  { id: "agents", label: "Agents", icon: "folder" },
   { id: "sessions", label: "Sessions", icon: "fileText" },
   { id: "config", label: "Settings", icon: "settings" },
 ];

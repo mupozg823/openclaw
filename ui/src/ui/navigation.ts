@@ -197,7 +197,20 @@ export function subtitleForTab(tab: Tab) {
 }
 
 // Tab cycling helpers for gamepad LB/RB navigation
-const TAB_ORDER: Tab[] = ["overview", "chat", "sessions", "config"];
+// Expanded to cover all major tabs accessible via LB/RB
+const TAB_ORDER: Tab[] = [
+  "overview",
+  "chat",
+  "agents",
+  "sessions",
+  "channels",
+  "skills",
+  "nodes",
+  "usage",
+  "cron",
+  "config",
+  "logs",
+];
 
 export function prevTab(current: Tab): Tab {
   const idx = TAB_ORDER.indexOf(current);
