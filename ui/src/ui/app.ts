@@ -54,6 +54,9 @@ import {
 import type { AppViewState } from "./app-view-state.ts";
 import { normalizeAssistantIdentity } from "./assistant-identity.ts";
 import { exportChatMarkdown } from "./chat/export.ts";
+import { GamepadController } from "./gamepad-controller.ts";
+import { moveFocus } from "./spatial-nav.ts";
+import { prevTab, nextTab } from "./navigation.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
@@ -439,6 +442,7 @@ export class OpenClawApp extends LitElement {
   private chatUserNearBottom = true;
   @state() chatNewMessagesBelow = false;
   private nodesPollInterval: number | null = null;
+  private gamepad = new GamepadController();
   private logsPollInterval: number | null = null;
   private debugPollInterval: number | null = null;
   private logsScrollFrame: number | null = null;
@@ -480,6 +484,26 @@ export class OpenClawApp extends LitElement {
       }
     };
     document.addEventListener("keydown", this.globalKeydownHandler);
+    this.gamepad.start({
+      onConfirm: () => (document.activeElement as HTMLElement)?.click(),
+      onBack: () => {
+        if (this.paletteOpen) {
+          this.paletteOpen = false;
+        } else if (this.sidebarOpen) {
+          this.sidebarOpen = false;
+        }
+      },
+      onPalette: () => {
+        this.paletteOpen = !this.paletteOpen;
+      },
+      onMic: () => {
+        const micBtn = document.querySelector<HTMLElement>(".agent-chat__input-btn--mic, [data-stt-toggle]");
+        micBtn?.click();
+      },
+      onPrevTab: () => this.setTab(prevTab(this.tab)),
+      onNextTab: () => this.setTab(nextTab(this.tab)),
+      onDpad: (dir) => moveFocus(dir),
+    });
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
   }
 
@@ -489,6 +513,7 @@ export class OpenClawApp extends LitElement {
 
   disconnectedCallback() {
     document.removeEventListener("keydown", this.globalKeydownHandler);
+    this.gamepad.stop();
     handleDisconnected(this as unknown as Parameters<typeof handleDisconnected>[0]);
     super.disconnectedCallback();
   }

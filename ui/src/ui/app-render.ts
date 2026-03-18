@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { renderBottomTabs } from "./views/bottom-tabs.ts";
 import {
   buildAgentMainSessionKey,
   parseAgentSessionKey,
@@ -1921,6 +1922,10 @@ export function renderApp(state: AppViewState) {
             : nothing
         }
       </main>
+      ${renderBottomTabs({
+        activeTab: state.tab,
+        onTabChange: (tab) => state.setTab(tab),
+      })}
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
       ${nothing}

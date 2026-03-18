@@ -48,7 +48,7 @@ export type SttCallbacks = {
 
 let activeRecognition: SpeechRecognitionInstance | null = null;
 
-export function startStt(callbacks: SttCallbacks): boolean {
+export function startStt(callbacks: SttCallbacks, opts?: { lang?: string }): boolean {
   const Ctor = getSpeechRecognitionCtor();
   if (!Ctor) {
     callbacks.onError?.("Speech recognition is not supported in this browser");
@@ -60,7 +60,7 @@ export function startStt(callbacks: SttCallbacks): boolean {
   const recognition = new Ctor();
   recognition.continuous = true;
   recognition.interimResults = true;
-  recognition.lang = navigator.language || "en-US";
+  recognition.lang = opts?.lang ?? navigator.language || "en-US";
 
   recognition.addEventListener("start", () => callbacks.onStart?.());
 

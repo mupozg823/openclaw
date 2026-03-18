@@ -191,6 +191,16 @@ export function loadSettings(): UiSettings {
     navGroupsCollapsed: {},
   };
 
+  // Handheld device detection — auto-optimize for devices like ROG Ally X
+  const isHandheld =
+    typeof window !== "undefined" &&
+    window.innerWidth <= 768 &&
+    navigator.maxTouchPoints > 0;
+  if (isHandheld) {
+    defaults.chatFocusMode = true;
+    defaults.navCollapsed = true;
+  }
+
   try {
     // First check for legacy key (no scope), then check for scoped key
     const scopedKey = settingsKeyForGateway(defaults.gatewayUrl);

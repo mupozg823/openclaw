@@ -195,3 +195,18 @@ export function titleForTab(tab: Tab) {
 export function subtitleForTab(tab: Tab) {
   return t(`subtitles.${tab}`);
 }
+
+// Tab cycling helpers for gamepad LB/RB navigation
+const TAB_ORDER: Tab[] = ["overview", "chat", "sessions", "config"];
+
+export function prevTab(current: Tab): Tab {
+  const idx = TAB_ORDER.indexOf(current);
+  if (idx <= 0) return TAB_ORDER[TAB_ORDER.length - 1];
+  return TAB_ORDER[idx - 1];
+}
+
+export function nextTab(current: Tab): Tab {
+  const idx = TAB_ORDER.indexOf(current);
+  if (idx < 0 || idx >= TAB_ORDER.length - 1) return TAB_ORDER[0];
+  return TAB_ORDER[idx + 1];
+}
