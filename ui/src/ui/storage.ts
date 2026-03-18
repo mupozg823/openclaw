@@ -192,9 +192,11 @@ export function loadSettings(): UiSettings {
   };
 
   // Handheld device detection — auto-optimize for devices like ROG Ally X
+  // ROG Ally X: 1920x1080 physical, 150% DPI → logical 1280x720
+  // Use 1366px to cover handheld + small tablet touch devices
   const isHandheld =
     typeof window !== "undefined" &&
-    window.innerWidth <= 768 &&
+    window.innerWidth <= 1366 &&
     navigator.maxTouchPoints > 0;
   if (isHandheld) {
     defaults.chatFocusMode = true;

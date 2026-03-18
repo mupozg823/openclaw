@@ -639,7 +639,9 @@
 }
 
 /* ─── ROG Ally X — Touch Target Optimization ─── */
-@media (max-width: 768px) and (pointer: coarse) {
+/* ROG Ally X: physical 1920x1080, DPI 150% → logical 1280x720
+   768px won't trigger at 1280px. Use 1366px to cover handheld + tablets */
+@media (max-width: 1366px) and (pointer: coarse) {
   :root {
     font-size: 15px;
   }
@@ -677,7 +679,7 @@
   display: none;
 }
 
-@media (max-width: 768px) and (pointer: coarse) {
+@media (max-width: 1366px) and (pointer: coarse) {
   .bottom-tabs {
     display: flex;
     position: fixed;
