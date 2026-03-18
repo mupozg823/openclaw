@@ -201,12 +201,16 @@ const TAB_ORDER: Tab[] = ["overview", "chat", "sessions", "config"];
 
 export function prevTab(current: Tab): Tab {
   const idx = TAB_ORDER.indexOf(current);
-  if (idx <= 0) return TAB_ORDER[TAB_ORDER.length - 1];
+  if (idx <= 0) {
+    return TAB_ORDER[TAB_ORDER.length - 1];
+  }
   return TAB_ORDER[idx - 1];
 }
 
 export function nextTab(current: Tab): Tab {
   const idx = TAB_ORDER.indexOf(current);
-  if (idx < 0 || idx >= TAB_ORDER.length - 1) return TAB_ORDER[0];
+  if (idx < 0 || idx >= TAB_ORDER.length - 1) {
+    return TAB_ORDER[0];
+  }
   return TAB_ORDER[idx + 1];
 }

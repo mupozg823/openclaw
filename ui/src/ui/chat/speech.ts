@@ -60,7 +60,7 @@ export function startStt(callbacks: SttCallbacks, opts?: { lang?: string }): boo
   const recognition = new Ctor();
   recognition.continuous = true;
   recognition.interimResults = true;
-  recognition.lang = opts?.lang ?? navigator.language || "en-US";
+  recognition.lang = opts?.lang ?? (navigator.language || "en-US");
 
   recognition.addEventListener("start", () => callbacks.onStart?.());
 
