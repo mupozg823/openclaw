@@ -1,0 +1,15 @@
+{
+  "id": "win-notify",
+  "name": "Windows Notifications",
+  "description": "Send Windows toast notifications, schedule reminders, and manage notification settings.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "defaultSound": {
+        "type": "boolean",
+        "description": "Play sound with notifications (default: true)"
+      }
+    }
+  }
+}

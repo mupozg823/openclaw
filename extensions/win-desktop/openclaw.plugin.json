@@ -1,0 +1,10 @@
+{
+  "id": "win-desktop",
+  "name": "Windows Desktop Control",
+  "description": "Virtual desktop switching, multi-monitor management, and window arrangement.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
