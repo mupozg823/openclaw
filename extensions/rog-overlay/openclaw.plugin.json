@@ -1,0 +1,19 @@
+{
+  "id": "rog-overlay",
+  "name": "ROG Game Overlay",
+  "description": "Performance HUD overlay with CPU, GPU, FPS, temperature, and battery for gaming sessions.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "pollIntervalMs": {
+        "type": "number",
+        "description": "Overlay data refresh interval in milliseconds (default: 1000)"
+      },
+      "position": {
+        "type": "string",
+        "description": "Overlay position: top-left, top-right, bottom-left, bottom-right (default: top-left)"
+      }
+    }
+  }
+}

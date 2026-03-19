@@ -1,0 +1,15 @@
+{
+  "id": "win-marketplace",
+  "name": "Plugin Marketplace",
+  "description": "Browse, search, install, and manage community OpenClaw plugins.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "registryUrl": {
+        "type": "string",
+        "description": "Plugin registry URL (default: built-in catalog)"
+      }
+    }
+  }
+}

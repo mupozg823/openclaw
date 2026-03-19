@@ -1,0 +1,11 @@
+{
+  "name": "@openclaw/rog-overlay",
+  "version": "2026.3.19",
+  "description": "OpenClaw ROG game overlay - performance HUD data and overlay control",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
