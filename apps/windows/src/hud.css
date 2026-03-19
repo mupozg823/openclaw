@@ -1,0 +1,110 @@
+/* OpenClaw HUD Overlay — hud.css */
+/* Transparent always-on-top mini panel */
+
+:root[data-theme="rog"] {
+  --hud-bg: rgba(0, 0, 0, 0.6);
+  --hud-border: rgba(255, 0, 51, 0.3);
+  --hud-text: rgba(255, 255, 255, 0.9);
+  --hud-muted: rgba(255, 255, 255, 0.5);
+  --hud-accent: #ff0033;
+  --hud-accent2: #00d4ff;
+  --hud-ok: #00e676;
+  --hud-warn: #ffab00;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hud-panel {
+  width: 140px;
+  padding: 10px 12px;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-family: "Cascadia Code", "Consolas", "Segoe UI", monospace;
+  font-size: 11px;
+  color: var(--hud-text);
+}
+
+/* ── Bar Rows ─────────────────────────────── */
+.hud-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.hud-row:last-of-type { margin-bottom: 0; }
+
+.hud-label {
+  width: 28px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--hud-muted);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.hud-bar-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hud-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+  width: 0%;
+}
+.hud-bar-fill.cpu { background: var(--hud-accent); }
+.hud-bar-fill.gpu { background: var(--hud-accent2); }
+.hud-bar-fill.ram { background: var(--hud-ok); }
+
+.hud-bar-fill.hot { background: #ff1744; }
+
+.hud-val {
+  width: 30px;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── Divider ──────────────────────────────── */
+.hud-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 6px 0;
+}
+
+/* ── Stat Rows ────────────────────────────── */
+.hud-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1px 0;
+}
+
+.hud-stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--hud-muted);
+}
+
+.hud-stat-val {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--hud-text);
+}

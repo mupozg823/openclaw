@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="rog">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw HUD</title>
+  <link rel="stylesheet" href="hud.css">
+</head>
+<body>
+  <div class="hud-panel" id="hudPanel">
+    <div class="hud-row">
+      <span class="hud-label">CPU</span>
+      <div class="hud-bar-track"><div class="hud-bar-fill cpu" id="hudCpuBar"></div></div>
+      <span class="hud-val" id="hudCpuVal">0%</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">GPU</span>
+      <div class="hud-bar-track"><div class="hud-bar-fill gpu" id="hudGpuBar"></div></div>
+      <span class="hud-val" id="hudGpuVal">0%</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">RAM</span>
+      <div class="hud-bar-track"><div class="hud-bar-fill ram" id="hudRamBar"></div></div>
+      <span class="hud-val" id="hudRamVal">0%</span>
+    </div>
+    <div class="hud-divider"></div>
+    <div class="hud-stat-row">
+      <span class="hud-stat-label">FPS</span>
+      <span class="hud-stat-val" id="hudFps">--</span>
+    </div>
+    <div class="hud-stat-row">
+      <span class="hud-stat-label">BAT</span>
+      <span class="hud-stat-val" id="hudBat">--%</span>
+    </div>
+    <div class="hud-stat-row">
+      <span class="hud-stat-label">TEMP</span>
+      <span class="hud-stat-val" id="hudTemp">--°C</span>
+    </div>
+  </div>
+  <script src="hud.js"></script>
+</body>
+</html>
