@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
@@ -202,6 +203,32 @@ function formatHelp(): string {
   ].join("\n");
 }
 
+// ── State Persistence ────────────────────────────────────────
+
+interface VoiceConfig {
+  defaultVoice?: string;
+  speechRate: number;
+}
+
+function loadState<T>(filepath: string, fallback: T): T {
+  try {
+    const raw = fs.readFileSync(filepath, "utf-8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveState<T>(filepath: string, data: T): void {
+  try {
+    const dir = path.dirname(filepath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filepath, JSON.stringify(data, null, 2), "utf-8");
+  } catch {
+    // silent fail
+  }
+}
+
 // ── Plugin Entry ────────────────────────────────────────────
 
 let defaultVoice: string | undefined;
@@ -212,6 +239,14 @@ export default definePluginEntry({
   name: "Windows Voice I/O",
   description: "Speech-to-text and text-to-speech using Windows System.Speech",
   register(api: OpenClawPluginApi) {
+    const stateDir = api.runtime.state.resolveStateDir();
+    const configFile = path.join(stateDir, "win-voice-config.json");
+
+    // Restore saved voice settings from disk
+    const savedConfig = loadState<VoiceConfig>(configFile, { speechRate: 0 });
+    defaultVoice = savedConfig.defaultVoice;
+    speechRate = savedConfig.speechRate;
+
     api.registerCommand({
       name: "voice",
       description: "Voice I/O — speak text (TTS) and listen for speech (STT).",
@@ -279,6 +314,7 @@ export default definePluginEntry({
             };
           }
           defaultVoice = match.name;
+          saveState(configFile, { defaultVoice, speechRate });
           return { text: `Default voice set to: ${match.name}` };
         }
 
@@ -289,6 +325,7 @@ export default definePluginEntry({
             return { text: `Usage: /voice rate <-10..10> (current: ${speechRate})` };
           }
           speechRate = Math.round(rate);
+          saveState(configFile, { defaultVoice, speechRate });
           return { text: `Speech rate set to ${speechRate} (0=normal, negative=slower, positive=faster)` };
         }
 

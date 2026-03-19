@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -119,6 +121,31 @@ async function setProfile(profile: PowerProfile): Promise<boolean> {
   }
 }
 
+// ── State Persistence ────────────────────────────────────────
+
+interface PersistedState {
+  customRules: AutoRule[];
+}
+
+function loadState<T>(filepath: string, fallback: T): T {
+  try {
+    const raw = fs.readFileSync(filepath, "utf-8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveState<T>(filepath: string, data: T): void {
+  try {
+    const dir = path.dirname(filepath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filepath, JSON.stringify(data, null, 2), "utf-8");
+  } catch {
+    // silent fail
+  }
+}
+
 // ── Engine State ─────────────────────────────────────────────
 
 let engineRunning = false;
@@ -195,6 +222,13 @@ export default definePluginEntry({
   name: "ROG Automation Rules",
   description: "Auto-switch performance profiles based on running applications",
   register(api: OpenClawPluginApi) {
+    const stateDir = api.runtime.state.resolveStateDir();
+    const stateFile = path.join(stateDir, "rog-automate-state.json");
+
+    // Restore custom rules from disk
+    const saved = loadState<PersistedState>(stateFile, { customRules: [] });
+    customRules = saved.customRules;
+
     const pollMs = 5000;
 
     api.registerCommand({
@@ -257,6 +291,7 @@ export default definePluginEntry({
           }
           const id = `custom-${name.toLowerCase()}`;
           customRules.push({ id, name, processNames: [proc], profile, enabled: true });
+          saveState(stateFile, { customRules });
           return { text: `Rule added: ${name} → detect "${proc}" → ${profile.toUpperCase()}` };
         }
 
@@ -268,6 +303,7 @@ export default definePluginEntry({
           const rule = allRules.find((r) => r.id.toLowerCase() === targetId || r.name.toLowerCase() === targetId);
           if (!rule) return { text: `Rule "${targetId}" not found.` };
           rule.enabled = action === "enable";
+          saveState(stateFile, { customRules });
           return { text: `Rule "${rule.name}" ${action}d.` };
         }
 

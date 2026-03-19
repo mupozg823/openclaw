@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
@@ -141,6 +143,31 @@ function formatDetailedHud(f: HudFrame): string {
   return sections.join("\n");
 }
 
+// ── State Persistence ────────────────────────────────────────
+
+interface OverlayConfig {
+  position: OverlayPosition;
+}
+
+function loadState<T>(filepath: string, fallback: T): T {
+  try {
+    const raw = fs.readFileSync(filepath, "utf-8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveState<T>(filepath: string, data: T): void {
+  try {
+    const dir = path.dirname(filepath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filepath, JSON.stringify(data, null, 2), "utf-8");
+  } catch {
+    // silent fail
+  }
+}
+
 // ── Overlay Engine ──────────────────────────────────────────
 
 let overlayRunning = false;
@@ -215,6 +242,13 @@ export default definePluginEntry({
   name: "ROG Game Overlay",
   description: "Performance HUD overlay for gaming sessions with CPU, GPU, FPS, temp, battery",
   register(api: OpenClawPluginApi) {
+    const stateDir = api.runtime.state.resolveStateDir();
+    const configFile = path.join(stateDir, "rog-overlay-config.json");
+
+    // Restore saved position from disk
+    const savedConfig = loadState<OverlayConfig>(configFile, { position: "top-left" });
+    overlayPosition = savedConfig.position;
+
     const pollMs = 1000;
 
     api.registerCommand({
@@ -280,6 +314,7 @@ export default definePluginEntry({
             return { text: `Usage: /overlay position <${validPositions.join("|")}>\nCurrent: ${overlayPosition}` };
           }
           overlayPosition = pos as OverlayPosition;
+          saveState(configFile, { position: overlayPosition });
           return { text: `Overlay position set to ${overlayPosition}.` };
         }
 

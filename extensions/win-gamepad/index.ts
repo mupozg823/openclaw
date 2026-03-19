@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { promisify } from "node:util";
 import {
   definePluginEntry,
@@ -142,6 +144,27 @@ async function pollXInput(controllerIndex = 0): Promise<GamepadState> {
   }
 }
 
+// ── State Persistence ────────────────────────────────────────
+
+function loadState<T>(filepath: string, fallback: T): T {
+  try {
+    const raw = fs.readFileSync(filepath, "utf-8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveState<T>(filepath: string, data: T): void {
+  try {
+    const dir = path.dirname(filepath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filepath, JSON.stringify(data, null, 2), "utf-8");
+  } catch {
+    // silent fail
+  }
+}
+
 // ── Binding State (in-memory, per plugin instance) ───────────
 
 function createBindingStore(initial: ButtonBinding[]): {
@@ -212,7 +235,13 @@ export default definePluginEntry({
   name: "Gamepad Commander",
   description: "Map gamepad buttons to OpenClaw commands via XInput",
   register(api: OpenClawPluginApi) {
-    const store = createBindingStore(DEFAULT_BINDINGS);
+    const stateDir = api.runtime.state.resolveStateDir();
+    const bindingsFile = path.join(stateDir, "win-gamepad-bindings.json");
+
+    // Restore saved bindings from disk; fall back to defaults
+    const saved = loadState<{ bindings: ButtonBinding[] }>(bindingsFile, { bindings: DEFAULT_BINDINGS });
+    const store = createBindingStore(saved.bindings);
+
     const controllerIndex: number =
       (api.config as Record<string, unknown>)?.controllerIndex as number ?? 0;
 
@@ -280,6 +309,7 @@ export default definePluginEntry({
 
         if (action === "reset") {
           store.reset();
+          try { fs.unlinkSync(bindingsFile); } catch { /* file may not exist */ }
           return { text: `Bindings reset to default ROG Ally X preset (${DEFAULT_BINDINGS.length} mappings).` };
         }
 
@@ -295,6 +325,7 @@ export default definePluginEntry({
             return { text: `Unknown button: ${rawButton}\nValid buttons: ${validButtonList()}` };
           }
           store.set({ button, command, description: "Custom binding" });
+          saveState(bindingsFile, { bindings: store.getAll() });
           return { text: `Bound ${button} → ${command}` };
         }
 
@@ -308,6 +339,7 @@ export default definePluginEntry({
             return { text: `Unknown button: ${rawButton}\nValid buttons: ${validButtonList()}` };
           }
           const removed = store.remove(button);
+          if (removed) saveState(bindingsFile, { bindings: store.getAll() });
           return { text: removed ? `Removed binding for ${button}.` : `No binding found for ${button}.` };
         }
 
