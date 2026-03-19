@@ -1,0 +1,11 @@
+{
+  "name": "@openclaw/win-app-control",
+  "version": "2026.3.14",
+  "description": "OpenClaw Windows application launch, focus, close, and list control",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

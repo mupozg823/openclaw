@@ -1,0 +1,11 @@
+{
+  "name": "@openclaw/win-file-search",
+  "version": "2026.3.14",
+  "description": "OpenClaw Windows file search plugin using Windows Search indexer",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

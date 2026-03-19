@@ -1,0 +1,15 @@
+{
+  "id": "win-app-control",
+  "name": "Windows App Control",
+  "description": "Launch, focus, close, and list Windows applications via PowerShell.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "maxResults": {
+        "type": "number",
+        "description": "Maximum number of listed processes (default: 30)"
+      }
+    }
+  }
+}

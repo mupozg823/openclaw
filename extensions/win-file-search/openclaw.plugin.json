@@ -1,0 +1,15 @@
+{
+  "id": "win-file-search",
+  "name": "Windows File Search",
+  "description": "Fast file and folder search on Windows using Windows Search indexer and PowerShell.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "maxResults": {
+        "type": "number",
+        "description": "Maximum number of search results to return (default: 20)"
+      }
+    }
+  }
+}
