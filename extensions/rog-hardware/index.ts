@@ -1,15 +1,18 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import {
+  type PowerMode,
+  getPowerMode,
+  parseCommandArgs,
+  parseNumber,
+  runPs,
+  setPowerMode,
+  POWER_MODE_MAP,
+} from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
-
-type PowerMode = "silent" | "performance" | "turbo" | "unknown";
 
 interface RogTelemetry {
   cpu: { tempC: number | null };
@@ -31,38 +34,6 @@ interface RogStatus {
   telemetry: RogTelemetry | null;
 }
 
-// ── PowerShell Helpers ───────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 10_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
-
-function parseNumber(raw: string): number | null {
-  if (raw === "" || raw == null) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
-}
-
-// ── Admin Detection ───────────────────────────────────────────
-
-async function isAdmin(): Promise<boolean> {
-  try {
-    const raw = await runPs(
-      `([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')`,
-    );
-    return raw.trim() === "True";
-  } catch {
-    return false;
-  }
-}
-
 // ── ROG Detection ────────────────────────────────────────────
 
 async function detectRogDevice(): Promise<{ isRog: boolean; model: string | null }> {
@@ -74,41 +45,6 @@ async function detectRogDevice(): Promise<{ isRog: boolean; model: string | null
     return { isRog, model: result || null };
   } catch {
     return { isRog: false, model: null };
-  }
-}
-
-// ── Power Mode ───────────────────────────────────────────────
-
-const POWER_MODE_MAP: Record<string, PowerMode> = {
-  "0": "silent",
-  "1": "performance",
-  "2": "turbo",
-};
-
-async function getPowerMode(): Promise<PowerMode> {
-  try {
-    const raw = await runPs(
-      `(Get-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -ErrorAction Stop).PowerMode`,
-    );
-    return POWER_MODE_MAP[raw.trim()] ?? "unknown";
-  } catch {
-    return "unknown";
-  }
-}
-
-async function setPowerMode(mode: PowerMode): Promise<{ ok: boolean; error?: string }> {
-  const modeValue = Object.entries(POWER_MODE_MAP).find(([, v]) => v === mode)?.[0];
-  if (modeValue == null) return { ok: false, error: `Unknown mode: ${mode}` };
-  if (!(await isAdmin())) {
-    return { ok: false, error: "Administrator privileges required. Run OpenClaw as admin to change power profiles." };
-  }
-  try {
-    await runPs(
-      `Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -Name PowerMode -Value ${modeValue}`,
-    );
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: `Registry write failed: ${e}` };
   }
 }
 
@@ -239,7 +175,6 @@ export default definePluginEntry({
   name: "ROG Hardware Control",
   description: "ASUS ROG hardware monitoring and performance profile control",
   register(api: OpenClawPluginApi) {
-    // Cache device detection
     let rogDetected: { isRog: boolean; model: string | null } | null = null;
 
     async function ensureRog(): Promise<{ isRog: boolean; model: string | null }> {
@@ -252,9 +187,7 @@ export default definePluginEntry({
       description: "ROG hardware monitoring and control (status, profile, temp, battery).",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         if (!action || action === "help") {
           return { text: formatHelp() };

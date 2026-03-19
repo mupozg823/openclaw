@@ -1,26 +1,13 @@
 import { execFile } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import { runPs, loadState, saveState, parseCommandArgs } from "../rog-win-shared/index.ts";
 
 const execFileAsync = promisify(execFile);
 
-// ── PowerShell ───────────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 30_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
-
-// ── TTS ─────────────────────────────────────────────────────
+// ── TTS ──────────────────────────────────────────────────────
 
 interface VoiceInfo {
   name: string;
@@ -37,7 +24,7 @@ $synth.GetInstalledVoices() | ForEach-Object {
   "$($_.VoiceInfo.Name)|$($_.VoiceInfo.Culture)|$($_.VoiceInfo.Gender)"
 }
 $synth.Dispose()
-`.trim());
+`.trim(), 30_000);
     return raw
       .split("\n")
       .filter(Boolean)
@@ -64,7 +51,7 @@ ${voiceSelect}
 $synth.Rate = ${clampedRate}
 $synth.Speak('${escaped}')
 $synth.Dispose()
-`.trim());
+`.trim(), 30_000);
     return true;
   } catch {
     return false;
@@ -92,7 +79,7 @@ ${voiceSelect}
 $synth.SetOutputToWaveFile('${filepath.replace(/'/g, "''")}')
 $synth.Speak('${escaped}')
 $synth.Dispose()
-`.trim());
+`.trim(), 30_000);
     return { ok: true, path: filepath, message: `Audio saved: ${filepath}` };
   } catch (e) {
     return { ok: false, path: "", message: `TTS file save failed: ${e}` };
@@ -121,7 +108,7 @@ try {
 } finally {
   $stt.Dispose()
 }
-`.trim());
+`.trim(), 30_000);
     const [text, conf] = raw.split("|");
     if (!text || text === "NO_SPEECH") {
       return { ok: false, text: "", confidence: 0 };
@@ -210,25 +197,6 @@ interface VoiceConfig {
   speechRate: number;
 }
 
-function loadState<T>(filepath: string, fallback: T): T {
-  try {
-    const raw = fs.readFileSync(filepath, "utf-8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveState<T>(filepath: string, data: T): void {
-  try {
-    const dir = path.dirname(filepath);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(filepath, JSON.stringify(data, null, 2), "utf-8");
-  } catch {
-    // silent fail
-  }
-}
-
 // ── Plugin Entry ────────────────────────────────────────────
 
 let defaultVoice: string | undefined;
@@ -252,9 +220,7 @@ export default definePluginEntry({
       description: "Voice I/O — speak text (TTS) and listen for speech (STT).",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         if (action === "help") return { text: formatHelp() };
 

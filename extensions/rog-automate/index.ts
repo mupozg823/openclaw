@@ -1,15 +1,22 @@
-import { execFile } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import {
+  runPs,
+  isAdmin,
+  loadState,
+  saveState,
+  parseCommandArgs,
+  AURA_REG_CANDIDATES,
+  FAN_REG_KEY,
+  POWER_REG_PATH,
+  POWER_MODE_MAP,
+} from "../rog-win-shared/index.ts";
+import type { PowerMode } from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
-type PowerProfile = "silent" | "performance" | "turbo";
+type PowerProfile = Exclude<PowerMode, "unknown">;
 
 type AuraMode = "static" | "breathing" | "color-cycle" | "rainbow" | "strobe" | "off";
 
@@ -45,30 +52,6 @@ const BUILTIN_RULES: AutoRule[] = [
   { id: "vscode", name: "VS Code (light)", processNames: ["Code"], profile: "silent", enabled: false, rgbMode: "breathing", rgbColor: "#007ACC", rgbBrightness: 1 },
 ];
 
-// ── PowerShell ───────────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 10_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
-
-async function isAdmin(): Promise<boolean> {
-  try {
-    const raw = await runPs(
-      `([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)`,
-    );
-    return raw.trim() === "True";
-  } catch {
-    return false;
-  }
-}
-
 // ── Process Detection ────────────────────────────────────────
 
 async function getRunningProcessNames(): Promise<Set<string>> {
@@ -98,28 +81,25 @@ function findMatchingRule(running: Set<string>, rules: AutoRule[]): AutoRule | n
 
 // ── Profile Switching ────────────────────────────────────────
 
-const POWER_MODE_MAP: Record<PowerProfile, string> = {
-  silent: "0",
-  performance: "1",
-  turbo: "2",
-};
-
 async function getCurrentProfile(): Promise<PowerProfile | null> {
   try {
     const raw = await runPs(
-      `(Get-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -ErrorAction Stop).PowerMode`,
+      `(Get-ItemProperty '${POWER_REG_PATH}' -ErrorAction Stop).PowerMode`,
     );
-    const map: Record<string, PowerProfile> = { "0": "silent", "1": "performance", "2": "turbo" };
-    return map[raw.trim()] ?? null;
+    const profile = POWER_MODE_MAP[raw.trim()];
+    return profile === "unknown" || profile == null ? null : (profile as PowerProfile);
   } catch {
     return null;
   }
 }
 
 async function setProfile(profile: PowerProfile): Promise<boolean> {
+  const modeVal = Object.entries(POWER_MODE_MAP).find(([, v]) => v === profile)?.[0];
+  if (modeVal == null) return false;
+  if (!(await isAdmin())) return false;
   try {
     await runPs(
-      `Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -Name PowerMode -Value ${POWER_MODE_MAP[profile]}`,
+      `Set-ItemProperty '${POWER_REG_PATH}' -Name PowerMode -Value ${modeVal}`,
     );
     return true;
   } catch {
@@ -127,29 +107,10 @@ async function setProfile(profile: PowerProfile): Promise<boolean> {
   }
 }
 
-// ── State Persistence ────────────────────────────────────────
+// ── State Types ──────────────────────────────────────────────
 
 interface PersistedState {
   customRules: AutoRule[];
-}
-
-function loadState<T>(filepath: string, fallback: T): T {
-  try {
-    const raw = fs.readFileSync(filepath, "utf-8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveState<T>(filepath: string, data: T): void {
-  try {
-    const dir = path.dirname(filepath);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(filepath, JSON.stringify(data, null, 2), "utf-8");
-  } catch {
-    // silent fail
-  }
 }
 
 // ── Engine State ─────────────────────────────────────────────
@@ -164,12 +125,6 @@ function getAllRules(): AutoRule[] {
 }
 
 // ── Linked Subsystem Control ─────────────────────────────────
-
-const AURA_REG_CANDIDATES = [
-  "HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\AuraService",
-  "HKLM:\\SOFTWARE\\ASUS\\AsRogAuraServiceSDK",
-  "HKLM:\\SOFTWARE\\ASUS\\AURA lighting effect add-on x64",
-] as const;
 
 async function applyRgb(rule: AutoRule): Promise<void> {
   if (!rule.rgbMode) return;
@@ -208,7 +163,7 @@ async function applyFanMode(rule: AutoRule): Promise<void> {
   if (val == null) return;
   try {
     await runPs(
-      `Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\FanControlPlugin' -Name FanScenario -Value ${val} -ErrorAction SilentlyContinue`,
+      `Set-ItemProperty '${FAN_REG_KEY}' -Name FanScenario -Value ${val} -ErrorAction SilentlyContinue`,
     );
   } catch {
     // silent fail
@@ -240,9 +195,8 @@ async function scanAndApply(): Promise<string | null> {
       const ok = await setProfile(match.profile);
       if (ok) {
         lastAppliedRule = match.id;
-        // Apply linked subsystems
-        await applyRgb(match);
-        await applyFanMode(match);
+        // Apply linked subsystems in parallel
+        await Promise.all([applyRgb(match), applyFanMode(match)]);
         return `[auto] ${match.name} detected → ${match.profile.toUpperCase()}${match.rgbMode ? ` + RGB:${match.rgbMode}` : ""}${match.fanMode ? ` + Fan:${match.fanMode}` : ""}`;
       }
     } else {
@@ -315,9 +269,7 @@ export default definePluginEntry({
       description: "ROG automation engine (start, stop, scan, rules, add, enable, disable).",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         if (action === "help") return { text: formatHelp() };
 

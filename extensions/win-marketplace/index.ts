@@ -1,11 +1,8 @@
-import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import { parseCommandArgs } from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -229,9 +226,7 @@ export default definePluginEntry({
       description: "Plugin marketplace — browse, search, install community plugins.",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
         const installed = getInstalledPluginIds(extensionsDir);
 
         if (action === "help") return { text: formatHelp() };

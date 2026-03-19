@@ -1,11 +1,15 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import {
+  runPs,
+  parseCommandArgs,
+  POWER_REG_PATH,
+  FAN_REG_KEY,
+  AURA_REG_CANDIDATES,
+  POWER_MODE_MAP,
+} from "../rog-win-shared/index.ts";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -76,38 +80,19 @@ export const PRESETS: Record<QuickPreset, PresetConfig> = {
   },
 };
 
-// ── PowerShell Helper ─────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 15_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
-
 // ── Unified Status Collection (single PS call) ────────────────
 
 const PS_STATUS_SCRIPT = `
-$pm = try { (Get-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -ErrorAction Stop).PowerMode } catch { 'N' }
+$pm = try { (Get-ItemProperty '${POWER_REG_PATH}' -ErrorAction Stop).PowerMode } catch { 'N' }
 $cpu = try { [math]::Round((Get-Counter '\\Processor(_Total)\\% Processor Time' -ErrorAction Stop).CounterSamples[0].CookedValue, 0) } catch { 0 }
 $gpu = try { (Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine -ErrorAction Stop | Measure-Object -Property UtilizationPercentage -Maximum).Maximum } catch { 0 }
 $os = Get-CimInstance Win32_OperatingSystem
 $ramPct = [math]::Round((($os.TotalVisibleMemorySize - $os.FreePhysicalMemory) / $os.TotalVisibleMemorySize) * 100, 0)
 $bat = try { (Get-CimInstance Win32_Battery -ErrorAction Stop).EstimatedChargeRemaining } catch { 'N' }
-$fan = try { (Get-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\FanControlPlugin' -ErrorAction SilentlyContinue).IsEnabledFanControl } catch { 0 }
+$fan = try { (Get-ItemProperty '${FAN_REG_KEY}' -ErrorAction SilentlyContinue).IsEnabledFanControl } catch { 0 }
 $game = try { (Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and $_.PriorityClass -eq 'High' } | Select-Object -First 1).ProcessName } catch { 'N' }
 "$pm|$cpu|$gpu|$ramPct|$bat|$fan|$game"
 `.trim();
-
-const POWER_MODE_MAP: Record<string, string> = {
-  "0": "SILENT",
-  "1": "PERFORMANCE",
-  "2": "TURBO",
-};
 
 async function collectStatus(): Promise<ControlCenterStatus> {
   try {
@@ -125,27 +110,30 @@ async function collectStatus(): Promise<ControlCenterStatus> {
     const activeGame =
       gameRaw && gameRaw !== "N" && gameRaw.trim() !== "" ? gameRaw.trim() : null;
 
-    // RGB availability: check if AURA service process exists
-    let rgbAvailable = false;
-    try {
-      const rgbRaw = await runPs(
-        `(Get-Process -Name 'LightingService' -ErrorAction SilentlyContinue) -ne $null`,
-      );
-      rgbAvailable = rgbRaw.trim() === "True";
-    } catch {
-      rgbAvailable = false;
-    }
+    // RGB availability and gamepad detection — run in parallel
+    const checkRgb = async (): Promise<boolean> => {
+      try {
+        const rgbRaw = await runPs(
+          `(Get-Process -Name 'LightingService' -ErrorAction SilentlyContinue) -ne $null`,
+        );
+        return rgbRaw.trim() === "True";
+      } catch {
+        return false;
+      }
+    };
 
-    // Gamepad detection
-    let gamepadConnected = false;
-    try {
-      const gpRaw = await runPs(
-        `(Get-PnpDevice -Class XnaComposite,HIDClass -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'OK' -and $_.FriendlyName -match 'Xbox|Gamepad|Controller' }).Count -gt 0`,
-      );
-      gamepadConnected = gpRaw.trim() === "True";
-    } catch {
-      gamepadConnected = false;
-    }
+    const checkGamepad = async (): Promise<boolean> => {
+      try {
+        const gpRaw = await runPs(
+          `(Get-PnpDevice -Class XnaComposite,HIDClass -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'OK' -and $_.FriendlyName -match 'Xbox|Gamepad|Controller' }).Count -gt 0`,
+        );
+        return gpRaw.trim() === "True";
+      } catch {
+        return false;
+      }
+    };
+
+    const [rgbAvailable, gamepadConnected] = await Promise.all([checkRgb(), checkGamepad()]);
 
     return {
       powerMode,
@@ -310,47 +298,48 @@ function formatPresets(): string {
 
 const PRESET_POWER_MAP: Record<string, string> = { silent: "0", performance: "1", turbo: "2" };
 const PRESET_AURA_MAP: Record<string, string> = { static: "0", breathing: "1", "color-cycle": "2", rainbow: "3", strobe: "4", off: "255" };
-const PRESET_AURA_REG_CANDIDATES = [
-  "HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\AuraService",
-  "HKLM:\\SOFTWARE\\ASUS\\AsRogAuraServiceSDK",
-  "HKLM:\\SOFTWARE\\ASUS\\AURA lighting effect add-on x64",
-] as const;
 
 async function applyPreset(cfg: PresetConfig): Promise<string> {
   const results: string[] = [];
 
-  // 1. Power profile
+  // 1. Power profile + fan mode — run in parallel
   const pmVal = PRESET_POWER_MAP[cfg.powerProfile];
-  if (pmVal) {
-    try {
-      await runPs(
-        `Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -Name PowerMode -Value ${pmVal} -ErrorAction Stop`,
-      );
-      results.push(`[OK] Power → ${cfg.powerProfile.toUpperCase()}`);
-    } catch {
-      results.push(`[--] Power → failed (admin required?)`);
-    }
-  }
-
-  // 2. Fan mode
   const fanMap: Record<string, string> = { auto: "0", silent: "1", turbo: "2" };
   const fanVal = fanMap[cfg.fanMode];
-  if (fanVal) {
+
+  const applyPower = async (): Promise<string> => {
+    if (!pmVal) return "";
     try {
       await runPs(
-        `Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\FanControlPlugin' -Name FanScenario -Value ${fanVal} -ErrorAction SilentlyContinue`,
+        `Set-ItemProperty '${POWER_REG_PATH}' -Name PowerMode -Value ${pmVal} -ErrorAction Stop`,
       );
-      results.push(`[OK] Fan → ${cfg.fanMode}`);
+      return `[OK] Power → ${cfg.powerProfile.toUpperCase()}`;
     } catch {
-      results.push(`[--] Fan → failed`);
+      return `[--] Power → failed (admin required?)`;
     }
-  }
+  };
 
-  // 3. RGB
+  const applyFan = async (): Promise<string> => {
+    if (!fanVal) return "";
+    try {
+      await runPs(
+        `Set-ItemProperty '${FAN_REG_KEY}' -Name FanScenario -Value ${fanVal} -ErrorAction SilentlyContinue`,
+      );
+      return `[OK] Fan → ${cfg.fanMode}`;
+    } catch {
+      return `[--] Fan → failed`;
+    }
+  };
+
+  const [powerResult, fanResult] = await Promise.all([applyPower(), applyFan()]);
+  if (powerResult) results.push(powerResult);
+  if (fanResult) results.push(fanResult);
+
+  // 2. RGB
   const auraVal = PRESET_AURA_MAP[cfg.rgbMode];
   if (auraVal) {
     let rgbOk = false;
-    for (const regPath of PRESET_AURA_REG_CANDIDATES) {
+    for (const regPath of AURA_REG_CANDIDATES) {
       try {
         await runPs(`
 $p = '${regPath}'
@@ -426,9 +415,7 @@ export default definePluginEntry({
       description: "ROG Control Center — unified dashboard, presets, health check, plugin list.",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         if (!action || action === "status") {
           const status = await collectStatus();

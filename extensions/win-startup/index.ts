@@ -1,11 +1,8 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import { runPs, isAdmin, parseCommandArgs } from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -27,32 +24,6 @@ export interface ServiceStatus {
   startType: string;
 }
 
-// ── PowerShell Helpers ───────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 15_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
-
-// ── Admin Detection ───────────────────────────────────────────
-
-async function checkIsAdmin(): Promise<boolean> {
-  try {
-    const raw = await runPs(
-      `([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')`,
-    );
-    return raw.trim() === "True";
-  } catch {
-    return false;
-  }
-}
-
 // ── Autostart (HKCU — no admin needed) ───────────────────────
 
 const AUTOSTART_KEY = `HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run`;
@@ -62,6 +33,7 @@ async function getAutostartPath(): Promise<string | null> {
   try {
     const raw = await runPs(
       `(Get-ItemProperty '${AUTOSTART_KEY}' -ErrorAction SilentlyContinue).${AUTOSTART_NAME}`,
+      15_000,
     );
     return raw || null;
   } catch {
@@ -81,6 +53,7 @@ async function enableAutostart(): Promise<{ ok: boolean; error?: string }> {
 
     await runPs(
       `Set-ItemProperty '${AUTOSTART_KEY}' -Name '${AUTOSTART_NAME}' -Value '${value.replace(/'/g, "''")}'`,
+      15_000,
     );
     return { ok: true };
   } catch (e) {
@@ -92,6 +65,7 @@ async function disableAutostart(): Promise<{ ok: boolean; error?: string }> {
   try {
     await runPs(
       `Remove-ItemProperty '${AUTOSTART_KEY}' -Name '${AUTOSTART_NAME}' -ErrorAction SilentlyContinue`,
+      15_000,
     );
     return { ok: true };
   } catch (e) {
@@ -105,9 +79,10 @@ async function getSystemInfo(): Promise<SystemInfo> {
   const [osRaw, psVersionRaw, adminResult] = await Promise.all([
     runPs(
       `$os = Get-CimInstance Win32_OperatingSystem; "$($os.Caption)|$($os.BuildNumber)|$($os.CSName)|$($os.LastBootUpTime)"`,
+      15_000,
     ).catch(() => "|||"),
-    runPs(`$PSVersionTable.PSVersion.ToString()`).catch(() => "unknown"),
-    checkIsAdmin(),
+    runPs(`$PSVersionTable.PSVersion.ToString()`, 15_000).catch(() => "unknown"),
+    isAdmin(),
   ]);
 
   const [osName = "Unknown", build = "Unknown", hostname = "Unknown", lastBoot = ""] =
@@ -156,6 +131,7 @@ async function getUptime(): Promise<string> {
   try {
     const raw = await runPs(
       `$os = Get-CimInstance Win32_OperatingSystem; (Get-Date) - $os.LastBootUpTime | ForEach-Object { "$($_.Days)|$($_.Hours)|$($_.Minutes)" }`,
+      15_000,
     );
     const [d, h, m] = raw.split("|").map((v) => Number(v) || 0);
     const parts: string[] = [];
@@ -188,7 +164,7 @@ Get-Service | Where-Object { $_.Name -like ${pattern.split(",").join(" -or $_.Na
 `.trim();
 
   try {
-    const raw = await runPs(script);
+    const raw = await runPs(script, 15_000);
     if (!raw) return [];
     return raw
       .split("\n")
@@ -206,8 +182,8 @@ Get-Service | Where-Object { $_.Name -like ${pattern.split(",").join(" -or $_.Na
 
 async function getDiagnostics(): Promise<string[]> {
   const [psVersion, adminResult] = await Promise.all([
-    runPs(`$PSVersionTable.PSVersion.ToString()`).catch(() => "unknown"),
-    checkIsAdmin(),
+    runPs(`$PSVersionTable.PSVersion.ToString()`, 15_000).catch(() => "unknown"),
+    isAdmin(),
   ]);
 
   const lines: string[] = [
@@ -280,9 +256,7 @@ export default definePluginEntry({
       description: "Windows OS integration — autostart, system info, services, diagnostics.",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         // Default: system summary
         if (!action) {

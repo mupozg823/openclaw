@@ -1,11 +1,8 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import { runPs, parseCommandArgs } from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -14,19 +11,6 @@ interface ProcessInfo {
   pid: number;
   memoryMB: number;
   windowTitle: string;
-}
-
-// ── PowerShell Helpers ───────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 15_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
 }
 
 // ── List running apps ────────────────────────────────────────
@@ -43,7 +27,7 @@ Get-Process | Where-Object { $_.MainWindowTitle -ne "" } |
 `.trim();
 
   try {
-    const raw = await runPs(script);
+    const raw = await runPs(script, 15_000);
     if (!raw) return [];
 
     return raw.split("\n").filter(Boolean).map((line) => {
@@ -91,18 +75,19 @@ async function launchApp(appName: string): Promise<{ ok: boolean; message: strin
   try {
     // URI-style launches (ms-settings:, ms-windows-store:)
     if (resolved.includes(":")) {
-      await runPs(`Start-Process "${resolved}"`);
+      await runPs(`Start-Process "${resolved}"`, 15_000);
       return { ok: true, message: `Launched ${appName}.` };
     }
 
     // Executable launch
-    await runPs(`Start-Process "${resolved}" -ErrorAction Stop`);
+    await runPs(`Start-Process "${resolved}" -ErrorAction Stop`, 15_000);
     return { ok: true, message: `Launched ${appName}.` };
   } catch {
     // Try searching Start Menu
     try {
       const found = await runPs(
         `$app = Get-StartApps | Where-Object { $_.Name -like '*${appName.replace(/'/g, "''")}*' } | Select-Object -First 1; if ($app) { Start-Process "shell:AppsFolder\\$($app.AppID)"; $app.Name } else { throw "Not found" }`,
+        15_000,
       );
       return { ok: true, message: `Launched ${found || appName}.` };
     } catch {
@@ -135,7 +120,7 @@ if ($proc) {
 `.trim();
 
   try {
-    const title = await runPs(script);
+    const title = await runPs(script, 15_000);
     return { ok: true, message: `Focused: ${title || appName}` };
   } catch {
     return { ok: false, message: `No running window found for "${appName}".` };
@@ -154,7 +139,7 @@ $count
 `.trim();
 
   try {
-    const count = await runPs(script);
+    const count = await runPs(script, 15_000);
     const n = Number(count) || 0;
     if (n === 0) {
       return { ok: false, message: `No running window found for "${appName}".` };
@@ -203,9 +188,7 @@ export default definePluginEntry({
       description: "Windows application control (list, launch, focus, close).",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         if (!action || action === "help") {
           return { text: formatHelp() };

@@ -1,11 +1,13 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import {
+  FAN_REG_KEY,
+  parseCommandArgs,
+  parseNumber,
+  runPs,
+} from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -26,28 +28,7 @@ interface FanProfile {
   description: string;
 }
 
-// ── PowerShell Helpers ───────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 10_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
-
-function parseNumber(raw: string): number | null {
-  if (raw === "" || raw == null) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
-}
-
 // ── Fan Control Registry ─────────────────────────────────────
-
-const FAN_REG_KEY = "HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\FanControlPlugin";
 
 // Maps FanMode to Armoury Crate registry values for fan scenario
 const FAN_MODE_MAP: Record<string, FanMode> = {
@@ -249,9 +230,7 @@ export default definePluginEntry({
       description: "ROG fan control and thermal monitoring (status, mode, temp, profile).",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         // /fan or /fan help
         if (!action || action === "help") {

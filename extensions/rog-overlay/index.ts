@@ -1,24 +1,15 @@
-import { execFile } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
-
-// ── PowerShell ───────────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 10_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
+import {
+  runPs,
+  parseNumber,
+  loadState,
+  saveState,
+  parseCommandArgs,
+  POWER_REG_PATH,
+  POWER_MODE_MAP,
+} from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -52,12 +43,11 @@ $os = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
 $ramPct = if ($os) { [math]::Round((($os.TotalVisibleMemorySize - $os.FreePhysicalMemory) / $os.TotalVisibleMemorySize) * 100, 0) } else { 0 }
 $fps = try { [math]::Round((Get-Counter '\\GPU Engine(*engtype_3D)\\Running time' -ErrorAction Stop).CounterSamples[0].CookedValue / 10000000, 0) } catch { 'N' }
 $bat = try { (Get-CimInstance Win32_Battery -ErrorAction Stop).EstimatedChargeRemaining } catch { 'N' }
-$pm = try { (Get-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -ErrorAction Stop).PowerMode } catch { 'N' }
+$pm = try { (Get-ItemProperty '${POWER_REG_PATH}' -ErrorAction Stop).PowerMode } catch { 'N' }
 $game = try { (Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and $_.PriorityClass -eq 'High' } | Select-Object -First 1).ProcessName } catch { 'N' }
 "$cpu|$cpuTemp|$gpu|$gpuTemp|$vram|$ramPct|$fps|$bat|$pm|$game"
 `.trim());
     const parts = raw.split("|");
-    const pmMap: Record<string, string> = { "0": "Silent", "1": "Performance", "2": "Turbo" };
     return {
       timestamp: Date.now(),
       cpuPct: Number(parts[0]) || 0,
@@ -68,7 +58,7 @@ $game = try { (Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and $_.Pr
       ramPct: Number(parts[5]) || 0,
       fps: parts[6] !== "N" ? Number(parts[6]) || null : null,
       batteryPct: parts[7] !== "N" ? Number(parts[7]) || null : null,
-      powerMode: parts[8] !== "N" ? (pmMap[parts[8] ?? ""] ?? parts[8]) : null,
+      powerMode: parts[8] !== "N" ? (POWER_MODE_MAP[parts[8] ?? ""] ?? parts[8]) : null,
       activeGame: parts[9] !== "N" && parts[9] !== "" ? (parts[9] ?? null) : null,
     };
   } catch {
@@ -147,25 +137,6 @@ function formatDetailedHud(f: HudFrame): string {
 
 interface OverlayConfig {
   position: OverlayPosition;
-}
-
-function loadState<T>(filepath: string, fallback: T): T {
-  try {
-    const raw = fs.readFileSync(filepath, "utf-8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveState<T>(filepath: string, data: T): void {
-  try {
-    const dir = path.dirname(filepath);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(filepath, JSON.stringify(data, null, 2), "utf-8");
-  } catch {
-    // silent fail
-  }
 }
 
 // ── Overlay Engine ──────────────────────────────────────────
@@ -256,9 +227,7 @@ export default definePluginEntry({
       description: "ROG performance overlay — HUD, stats, engine control.",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim().toLowerCase() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0] ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         if (action === "help") return { text: formatHelp() };
 

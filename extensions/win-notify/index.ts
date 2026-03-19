@@ -1,22 +1,6 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
-
-// ── PowerShell ───────────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 15_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
+import { runPs, parseCommandArgs } from "../rog-win-shared/index.ts";
 
 // ── Toast Notification ──────────────────────────────────────
 
@@ -70,7 +54,7 @@ $xml.LoadXml($template)
 $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OpenClaw').Show($toast)
 Write-Host 'OK'
-`.trim());
+`.trim(), 15_000);
     return true;
   } catch {
     return false;
@@ -140,6 +124,7 @@ async function getDoNotDisturb(): Promise<boolean | null> {
   try {
     const raw = await runPs(
       `(Get-ItemProperty 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings' -Name NOC_GLOBAL_SETTING_TOASTS_ENABLED -ErrorAction SilentlyContinue).NOC_GLOBAL_SETTING_TOASTS_ENABLED`,
+      15_000,
     );
     return raw.trim() === "0";
   } catch {
@@ -217,9 +202,8 @@ export default definePluginEntry({
         "Windows notifications — send toasts, set reminders, check DND.",
       acceptsArgs: true,
       handler: async (ctx) => {
+        const { action, tokens } = parseCommandArgs(ctx);
         const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
 
         if (action === "help") return { text: formatHelp() };
 

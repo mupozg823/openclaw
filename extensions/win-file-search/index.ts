@@ -1,11 +1,8 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import { runPs } from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -15,19 +12,6 @@ interface SearchResult {
   size: string;
   modified: string;
   kind: "file" | "folder";
-}
-
-// ── PowerShell Helpers ───────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 15_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
 }
 
 // ── Windows Search via OleDB ─────────────────────────────────
@@ -62,7 +46,7 @@ $results -join "\\n"
 `.trim();
 
   try {
-    const raw = await runPs(script);
+    const raw = await runPs(script, 15_000);
     if (!raw) return [];
 
     return raw.split("\n").filter(Boolean).map((line) => {
@@ -100,7 +84,7 @@ Get-ChildItem -Path $env:USERPROFILE -Recurse -Depth 4 -ErrorAction SilentlyCont
 `.trim();
 
   try {
-    const raw = await runPs(script);
+    const raw = await runPs(script, 15_000);
     if (!raw) return [];
 
     return raw.split("\n").filter(Boolean).map((line) => {
@@ -184,7 +168,7 @@ $results -join "\\n"
 `.trim();
 
   try {
-    const raw = await runPs(script);
+    const raw = await runPs(script, 15_000);
     if (!raw) return [];
 
     return raw.split("\n").filter(Boolean).map((line) => {
@@ -226,7 +210,7 @@ $results -join "\\n"
 `.trim();
 
   try {
-    const raw = await runPs(script);
+    const raw = await runPs(script, 15_000);
     if (!raw) return [];
 
     return raw.split("\n").filter(Boolean).map((line) => {

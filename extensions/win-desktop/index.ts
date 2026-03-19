@@ -1,22 +1,6 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
-
-// ── PowerShell ───────────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 15_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
+import { runPs, parseCommandArgs } from "../rog-win-shared/index.ts";
 
 // ── Virtual Desktop ─────────────────────────────────────────
 
@@ -60,7 +44,7 @@ if ($ids -eq $null) {
     Write-Host "$($i+1)|$name|$isCurrent"
   }
 }
-`.trim());
+`.trim(), 15_000);
     return raw
       .split("\n")
       .filter(Boolean)
@@ -87,7 +71,7 @@ async function switchDesktop(direction: "left" | "right" | "new"): Promise<boole
     await runPs(`
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.SendKeys]::SendWait('${keyMap[direction]}')
-`.trim());
+`.trim(), 15_000);
     return true;
   } catch {
     return false;
@@ -99,7 +83,7 @@ async function closeCurrentDesktop(): Promise<boolean> {
     await runPs(`
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.SendKeys]::SendWait('^%{F4}')
-`.trim());
+`.trim(), 15_000);
     return true;
   } catch {
     return false;
@@ -123,7 +107,7 @@ Add-Type -AssemblyName System.Windows.Forms
   $r = $_.Bounds
   "$($_.DeviceName)|$($r.Width)x$($r.Height)|$($_.Primary)|$($r.X),$($r.Y)"
 }
-`.trim());
+`.trim(), 15_000);
     return raw
       .split("\n")
       .filter(Boolean)
@@ -155,7 +139,7 @@ async function getVisibleWindows(): Promise<WindowInfo[]> {
 Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -First 20 | ForEach-Object {
   "$($_.MainWindowTitle)|$($_.Id)|$($_.ProcessName)"
 }
-`.trim());
+`.trim(), 15_000);
     return raw
       .split("\n")
       .filter(Boolean)
@@ -183,7 +167,7 @@ async function arrangeWindows(layout: "cascade" | "tile-h" | "tile-v" | "minimiz
   const script = scripts[layout];
   if (!script) return false;
   try {
-    await runPs(script);
+    await runPs(script, 15_000);
     return true;
   } catch {
     return false;
@@ -203,7 +187,7 @@ async function snapWindow(direction: "left" | "right" | "up" | "down"): Promise<
     await runPs(`
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.SendKeys]::SendWait('${keyMap[direction]}')
-`.trim());
+`.trim(), 15_000);
     return true;
   } catch {
     return false;
@@ -275,9 +259,7 @@ export default definePluginEntry({
       description: "Virtual desktops, monitors, and window arrangement.",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim().toLowerCase() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0] ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         if (action === "help") return { text: formatHelp() };
 

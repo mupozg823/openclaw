@@ -1,13 +1,10 @@
-import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
 } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import { runPs, loadState, saveState, parseCommandArgs } from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -78,19 +75,6 @@ export const DEFAULT_BINDINGS: ButtonBinding[] = [
   { button: "DpadDown", command: "/aura bright 0", description: "Turn off AURA lighting" },
 ];
 
-// ── PowerShell Helper ────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 8_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
-
 // ── XInput Polling ───────────────────────────────────────────
 
 const XINPUT_CSHARP = `
@@ -130,7 +114,7 @@ if ($result -eq 0) {
 async function pollXInput(controllerIndex = 0): Promise<GamepadState> {
   try {
     const script = XINPUT_CSHARP.replace("INDEX", String(controllerIndex));
-    const raw = await runPs(script);
+    const raw = await runPs(script, 8_000);
     const [status, buttons, lt, rt] = raw.split("|");
     const connected = status === "Connected";
     return {
@@ -141,27 +125,6 @@ async function pollXInput(controllerIndex = 0): Promise<GamepadState> {
     };
   } catch {
     return { connected: false, buttons: 0, leftTrigger: 0, rightTrigger: 0 };
-  }
-}
-
-// ── State Persistence ────────────────────────────────────────
-
-function loadState<T>(filepath: string, fallback: T): T {
-  try {
-    const raw = fs.readFileSync(filepath, "utf-8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveState<T>(filepath: string, data: T): void {
-  try {
-    const dir = path.dirname(filepath);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(filepath, JSON.stringify(data, null, 2), "utf-8");
-  } catch {
-    // silent fail
   }
 }
 
@@ -250,9 +213,7 @@ export default definePluginEntry({
       description: "Manage gamepad button-to-command mappings (bind, unbind, poll, reset).",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         // /gamepad  (no args) — quick status
         if (!action) {

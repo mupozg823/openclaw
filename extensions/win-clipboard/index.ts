@@ -1,23 +1,7 @@
-import { execFile } from "node:child_process";
 import path from "node:path";
-import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
-
-// ── PowerShell ───────────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 15_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
+import { runPs, parseCommandArgs } from "../rog-win-shared/index.ts";
 
 // ── Clipboard Read ───────────────────────────────────────────
 
@@ -25,6 +9,7 @@ async function readClipboardText(): Promise<string | null> {
   try {
     const text = await runPs(
       `Add-Type -Assembly System.Windows.Forms; [System.Windows.Forms.Clipboard]::GetText()`,
+      15_000,
     );
     return text || null;
   } catch {
@@ -42,7 +27,7 @@ elseif ($d.ContainsImage()) { "image" }
 elseif ($d.ContainsText()) { "text" }
 elseif ($d.ContainsFileDropList()) { "files" }
 else { "other" }
-`.trim());
+`.trim(), 15_000);
     return raw || "empty";
   } catch {
     return "empty";
@@ -55,7 +40,7 @@ async function getClipboardFiles(): Promise<string[]> {
 Add-Type -Assembly System.Windows.Forms
 $files = [System.Windows.Forms.Clipboard]::GetFileDropList()
 $files | ForEach-Object { $_ }
-`.trim());
+`.trim(), 15_000);
     return raw.split("\n").filter(Boolean);
   } catch {
     return [];
@@ -88,7 +73,7 @@ $bmp.Save('${filepath.replace(/'/g, "''")}', [System.Drawing.Imaging.ImageFormat
 $g.Dispose()
 $bmp.Dispose()
 "OK"
-`.trim());
+`.trim(), 15_000);
     return { ok: true, path: filepath, message: `Screenshot saved: ${filepath}` };
   } catch (e) {
     return { ok: false, path: "", message: `Screenshot failed: ${e}` };
@@ -114,7 +99,7 @@ if ($img -eq $null) { "NO_IMAGE" } else {
   $img.Dispose()
   "OK"
 }
-`.trim());
+`.trim(), 15_000);
     if (result === "NO_IMAGE") {
       return { ok: false, path: "", message: "No image in clipboard." };
     }
@@ -151,34 +136,34 @@ export default definePluginEntry({
       description: "Clipboard and screenshot operations (paste, image, screenshot, files).",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim().toLowerCase() ?? "";
+        const { action } = parseCommandArgs(ctx);
 
-        if (args === "help") return { text: formatHelp() };
+        if (action === "help") return { text: formatHelp() };
 
-        if (args === "info" || args === "format") {
+        if (action === "info" || action === "format") {
           const fmt = await getClipboardFormat();
           return { text: `Clipboard format: ${fmt}` };
         }
 
-        if (args === "paste" || args === "text") {
+        if (action === "paste" || action === "text") {
           const text = await readClipboardText();
           if (!text) return { text: "Clipboard is empty or contains no text." };
           const preview = text.length > 2000 ? `${text.slice(0, 2000)}...(truncated)` : text;
           return { text: `Clipboard text (${text.length} chars):\n\n${preview}` };
         }
 
-        if (args === "files") {
+        if (action === "files") {
           const files = await getClipboardFiles();
           if (files.length === 0) return { text: "No files in clipboard." };
           return { text: `Clipboard files (${files.length}):\n${files.join("\n")}` };
         }
 
-        if (args === "image" || args === "save") {
+        if (action === "image" || action === "save") {
           const result = await saveClipboardImage();
           return { text: result.message };
         }
 
-        if (args === "screenshot" || args === "screen" || args === "ss") {
+        if (action === "screenshot" || action === "screen" || action === "ss") {
           const result = await captureScreenshot();
           return { text: result.message };
         }

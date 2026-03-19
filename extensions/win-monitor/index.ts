@@ -1,9 +1,6 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import { runPs, parseCommandArgs } from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -43,19 +40,6 @@ interface SystemSnapshot {
   network: NetworkSnapshot;
 }
 
-// ── PowerShell ───────────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 15_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
-
 // ── CPU ──────────────────────────────────────────────────────
 
 async function getCpu(): Promise<CpuSnapshot> {
@@ -67,7 +51,7 @@ $top = Get-Process | Sort-Object CPU -Descending | Select-Object -First 5 | ForE
 }
 "CPU:$([math]::Round($cpu,1))"
 $top
-`.trim());
+`.trim(), 15_000);
     const lines = raw.split("\n").filter(Boolean);
     const cpuLine = lines.find((l) => l.startsWith("CPU:"));
     const usagePct = cpuLine ? Number(cpuLine.split(":")[1]) || 0 : 0;
@@ -95,7 +79,7 @@ $vram = $vc.AdapterRAM
 $temp = $null
 try { $temp = ((Get-Counter '\\GPU Engine(*)\\Temperature' -ErrorAction Stop).CounterSamples | Measure-Object -Property CookedValue -Maximum).Maximum } catch {}
 "$e|$([math]::Round($local/1MB,0))|$([math]::Round($vram/1MB,0))|$temp"
-`.trim());
+`.trim(), 15_000);
     const [usage, used, total, temp] = raw.split("|");
     return {
       usagePct: usage ? Number(usage) : null,
@@ -123,7 +107,7 @@ $top = Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First
 }
 "RAM:$used|$total|$pct"
 $top
-`.trim());
+`.trim(), 15_000);
     const lines = raw.split("\n").filter(Boolean);
     const ramLine = lines.find((l) => l.startsWith("RAM:"));
     const ramParts = ramLine?.replace("RAM:", "").split("|") ?? [];
@@ -156,7 +140,7 @@ Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" -ErrorAction Stop | ForE
   $pct = if ($total -gt 0) { [math]::Round(($used/$total)*100, 0) } else { 0 }
   "$($_.DeviceID)|$used|$total|$pct"
 }
-`.trim());
+`.trim(), 15_000);
     const drives = raw
       .split("\n")
       .filter(Boolean)
@@ -186,7 +170,7 @@ Get-CimInstance Win32_PerfFormattedData_Tcpip_NetworkInterface -ErrorAction Stop
   ForEach-Object {
     "$($_.Name)|$([math]::Round($_.BytesSentPersec/1KB,1))|$([math]::Round($_.BytesReceivedPersec/1KB,1))"
   }
-`.trim());
+`.trim(), 15_000);
     const adapters = raw
       .split("\n")
       .filter(Boolean)
@@ -354,26 +338,26 @@ export default definePluginEntry({
       description: "System monitoring dashboard (cpu, gpu, ram, disk, net).",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim().toLowerCase() ?? "";
+        const { action } = parseCommandArgs(ctx);
 
-        if (args === "help") return { text: formatHelp() };
+        if (action === "help") return { text: formatHelp() };
 
-        if (args === "cpu") {
+        if (action === "cpu") {
           const cpu = await getCpu();
           return { text: formatCpuDetail(cpu) };
         }
 
-        if (args === "gpu") {
+        if (action === "gpu") {
           const gpu = await getGpu();
           return { text: formatGpuDetail(gpu) };
         }
 
-        if (args === "ram" || args === "mem") {
+        if (action === "ram" || action === "mem") {
           const ram = await getRam();
           return { text: formatRamDetail(ram) };
         }
 
-        if (args === "disk") {
+        if (action === "disk") {
           const disk = await getDisk();
           if (disk.drives.length === 0) return { text: "No drives found." };
           const lines = disk.drives.map(
@@ -382,7 +366,7 @@ export default definePluginEntry({
           return { text: lines.join("\n") };
         }
 
-        if (args === "net" || args === "network") {
+        if (action === "net" || action === "network") {
           const net = await getNetwork();
           if (net.adapters.length === 0) return { text: "No active network adapters." };
           const lines = net.adapters.map(
@@ -391,7 +375,7 @@ export default definePluginEntry({
           return { text: lines.join("\n") };
         }
 
-        if (args === "history" || args === "trend") {
+        if (action === "history" || action === "trend") {
           if (history.length < 2) {
             return { text: "Not enough data yet. Run /monitor a few times to build history." };
           }

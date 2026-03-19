@@ -26,6 +26,21 @@
         "resizable": true,
         "center": true,
         "transparent": false
+      },
+      {
+        "label": "hud",
+        "title": "OpenClaw HUD",
+        "url": "hud.html",
+        "width": 160,
+        "height": 220,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "transparent": true,
+        "skipTaskbar": true,
+        "x": 20,
+        "y": 20
       }
     ]
   },

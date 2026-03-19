@@ -1,9 +1,6 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
-
-const execFileAsync = promisify(execFile);
+import { runPs, isAdmin, parseCommandArgs, AURA_REG_CANDIDATES } from "../rog-win-shared/index.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -17,12 +14,6 @@ interface AuraState {
 }
 
 // ── Constants ────────────────────────────────────────────────
-
-const AURA_REG_CANDIDATES = [
-  "HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\AuraService",
-  "HKLM:\\SOFTWARE\\ASUS\\AsRogAuraServiceSDK",
-  "HKLM:\\SOFTWARE\\ASUS\\AURA lighting effect add-on x64",
-] as const;
 
 const MODE_MAP: Record<string, AuraMode> = {
   "0": "static",
@@ -61,30 +52,6 @@ const NAMED_COLORS: Record<string, string> = {
   rog: "#FF4655", // ROG Republic Red
   republic: "#FF4655",
 };
-
-// ── PowerShell ───────────────────────────────────────────────
-
-const PS_OPTS = { shell: false, timeout: 10_000 } as const;
-
-async function runPs(script: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    PS_OPTS,
-  );
-  return stdout.trim();
-}
-
-async function isAdmin(): Promise<boolean> {
-  try {
-    const raw = await runPs(
-      `([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)`,
-    );
-    return raw.trim() === "True";
-  } catch {
-    return false;
-  }
-}
 
 // ── Registry Path Resolution ─────────────────────────────────
 
@@ -262,9 +229,7 @@ export default definePluginEntry({
       description: "ROG Aura Sync RGB control (mode, color, brightness, speed).",
       acceptsArgs: true,
       handler: async (ctx) => {
-        const args = ctx.args?.trim() ?? "";
-        const tokens = args.split(/\s+/).filter(Boolean);
-        const action = tokens[0]?.toLowerCase() ?? "";
+        const { action, tokens } = parseCommandArgs(ctx);
 
         if (action === "help") {
           const regPath = await resolveAuraRegPath();
