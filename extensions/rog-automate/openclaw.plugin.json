@@ -1,0 +1,15 @@
+{
+  "id": "rog-automate",
+  "name": "ROG Automation Rules",
+  "description": "Automatically switch performance profiles and RGB when specific apps are detected.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "pollIntervalMs": {
+        "type": "number",
+        "description": "Process detection poll interval in milliseconds (default: 5000)"
+      }
+    }
+  }
+}

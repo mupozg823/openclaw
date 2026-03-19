@@ -1,0 +1,11 @@
+{
+  "name": "@openclaw/rog-aura",
+  "version": "2026.3.14",
+  "description": "OpenClaw ROG Aura Sync RGB lighting control",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

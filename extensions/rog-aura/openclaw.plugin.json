@@ -1,0 +1,10 @@
+{
+  "id": "rog-aura",
+  "name": "ROG Aura Sync RGB",
+  "description": "Control ASUS Aura Sync RGB lighting on ROG devices via Armoury Crate registry and WMI.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

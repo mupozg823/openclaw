@@ -1,0 +1,11 @@
+{
+  "name": "@openclaw/rog-automate",
+  "version": "2026.3.14",
+  "description": "OpenClaw ROG automation rule engine - app detection triggers profile/RGB changes",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
