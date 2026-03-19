@@ -380,7 +380,29 @@ function sendCommand(method, params) {
   }
 }
 
-// ── Demo Data (used when gateway is not connected) ───
+// ── Telemetry Polling ────────────────────────────────
+let pollBusy = false;
+
+async function pollTelemetry() {
+  if (pollBusy) return;
+  pollBusy = true;
+  try {
+    if (tauriInvoke) {
+      const data = await tauriInvoke("get_telemetry");
+      updateDashboard(data);
+      setConnectionStatus(true);
+    } else {
+      updateDashboard(generateDemoData());
+    }
+  } catch (e) {
+    console.warn("[telemetry] poll failed:", e);
+    updateDashboard(generateDemoData());
+  } finally {
+    pollBusy = false;
+  }
+}
+
+// ── Demo Data (fallback when Tauri unavailable) ──────
 function generateDemoData() {
   const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   return {
@@ -392,17 +414,12 @@ function generateDemoData() {
     ramTotal: 16,
     vramUsed: rand(512, 4096),
     vramTotal: 8192,
-    fps: rand(30, 144),
     batteryPct: rand(20, 95),
-    netUp: rand(100, 50000),
-    netDown: rand(1000, 200000),
     powerMode: state.activeProfile,
     topProcs: [
       { name: "explorer.exe", cpu: rand(0, 5) },
       { name: "chrome.exe", cpu: rand(2, 15) },
-      { name: "openclaw.exe", cpu: rand(0, 3) },
       { name: "dwm.exe", cpu: rand(0, 4) },
-      { name: "svchost.exe", cpu: rand(0, 2) },
     ].sort((a, b) => b.cpu - a.cpu),
   };
 }
@@ -413,13 +430,10 @@ function init() {
   renderMarketplace();
   initTauri();
 
-  // Start polling (demo data when disconnected, real data via Tauri when connected)
-  setInterval(() => {
-    const data = generateDemoData();
-    updateDashboard(data);
-  }, POLL_INTERVAL_MS);
+  // Start telemetry polling (real data via Tauri, fallback to demo)
+  setInterval(pollTelemetry, POLL_INTERVAL_MS);
 
-  // Initial render
+  // Initial render with demo data (first real poll will overwrite)
   updateDashboard(generateDemoData());
 }
 

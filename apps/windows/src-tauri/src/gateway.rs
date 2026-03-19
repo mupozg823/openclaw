@@ -118,6 +118,67 @@ fn run_powershell(script: &str) -> Result<String, String> {
     }
 }
 
+// ── Telemetry Collection ─────────────────────────────────────
+
+/// Collect system telemetry via a single PowerShell call.
+pub fn collect_telemetry() -> Result<Value, String> {
+    let script = r#"
+$ErrorActionPreference = 'SilentlyContinue'
+$cpu = [math]::Round((Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples[0].CookedValue, 0)
+$cpuTemp = $null
+$t = (Get-CimInstance -Namespace root/WMI -ClassName MSAcpi_ThermalZoneTemperature).CurrentTemperature
+if ($t) { $cpuTemp = [math]::Round(($t[0] / 10) - 273.15, 0) }
+$gpu = 0
+$vramUsed = 0
+$vramTotal = 0
+$gpuTemp = $null
+$g = Get-CimInstance Win32_VideoController
+if ($g) { $vramTotal = [math]::Round($g[0].AdapterRAM / 1MB, 0) }
+try {
+  $gc = Get-Counter '\GPU Engine(*engtype_3D)\Utilization Percentage'
+  $gpu = [math]::Round(($gc.CounterSamples | Measure-Object -Property CookedValue -Maximum).Maximum, 0)
+} catch {}
+try {
+  $gm = Get-Counter '\GPU Process Memory(*)\Dedicated Usage'
+  $vramUsed = [math]::Round(($gm.CounterSamples | Measure-Object -Property CookedValue -Sum).Sum / 1MB, 0)
+} catch {}
+$os = Get-CimInstance Win32_OperatingSystem
+$ramTotal = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
+$ramUsed = [math]::Round(($os.TotalVisibleMemorySize - $os.FreePhysicalMemory) / 1MB, 1)
+$bat = (Get-CimInstance Win32_Battery).EstimatedChargeRemaining
+$pm = try { (Get-ItemProperty 'HKLM:\SOFTWARE\ASUS\ARMOURY CRATE Service\ThrottlePlugin\ROG ATKStatus').PowerMode } catch { 'N' }
+$pmName = switch ($pm) { '0' {'silent'} '1' {'performance'} '2' {'turbo'} default {'unknown'} }
+$procs = Get-Process | Where-Object { $_.CPU -gt 0 } | Sort-Object CPU -Descending | Select-Object -First 5 | ForEach-Object {
+  '{"name":"' + ($_.ProcessName -replace '"','') + '","cpu":' + [math]::Round($_.CPU, 1) + '}'
+}
+$procsJson = '[' + ($procs -join ',') + ']'
+Write-Output "$cpu|$cpuTemp|$gpu|$gpuTemp|$ramUsed|$ramTotal|$vramUsed|$vramTotal|$bat|$pmName|$procsJson"
+"#;
+    let raw = run_powershell(script)?;
+    let parts: Vec<&str> = raw.splitn(11, '|').collect();
+    let parse_i = |i: usize| parts.get(i).and_then(|s| s.trim().parse::<i64>().ok());
+    let parse_f = |i: usize| parts.get(i).and_then(|s| s.trim().parse::<f64>().ok());
+
+    let top_procs: Value = parts
+        .get(10)
+        .and_then(|s| serde_json::from_str(s.trim()).ok())
+        .unwrap_or(json!([]));
+
+    Ok(json!({
+        "cpuPct": parse_i(0).unwrap_or(0),
+        "cpuTemp": parse_i(1),
+        "gpuTemp": parse_i(3),
+        "gpuPct": parse_i(2).unwrap_or(0),
+        "ramUsed": parse_f(4),
+        "ramTotal": parse_f(5),
+        "vramUsed": parse_i(6).unwrap_or(0),
+        "vramTotal": parse_i(7).unwrap_or(0),
+        "batteryPct": parse_i(8),
+        "powerMode": parts.get(9).map(|s| s.trim()).unwrap_or("unknown"),
+        "topProcs": top_procs,
+    }))
+}
+
 // ── Server Request Handler ───────────────────────────────────
 
 fn handle_server_request(method: &str, frame: &Value) -> Result<Value, String> {

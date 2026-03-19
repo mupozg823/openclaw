@@ -18,6 +18,11 @@ fn send_gateway_command(method: String, params: String) -> Result<String, String
     Ok(format!("{{\"queued\":\"{}\"}}", method))
 }
 
+#[tauri::command]
+fn get_telemetry() -> Result<serde_json::Value, String> {
+    gateway::collect_telemetry()
+}
+
 /// Toggle the dashboard window visibility
 fn toggle_dashboard(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("dashboard") {
@@ -84,7 +89,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_status, send_gateway_command])
+        .invoke_handler(tauri::generate_handler![get_status, send_gateway_command, get_telemetry])
         .run(tauri::generate_context!())
         .expect("error while running OpenClaw tray");
 }
