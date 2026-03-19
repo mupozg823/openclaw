@@ -44,17 +44,19 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Register global shortcut: Win+Space
+            // Register global shortcut: Ctrl+Shift+O (OpenClaw)
             #[cfg(desktop)]
             {
                 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 
-                let shortcut = Shortcut::new(Some(Modifiers::SUPER), Code::Space);
-                app.global_shortcut().on_shortcut(shortcut, |app, _shortcut, _event| {
-                    println!("Win+Space triggered — toggle OpenClaw overlay");
-                    // TODO: Toggle overlay window or send command to gateway
+                let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyO);
+                match app.global_shortcut().on_shortcut(shortcut, |app, _shortcut, _event| {
+                    println!("Ctrl+Alt+O triggered — toggle OpenClaw overlay");
                     let _ = app;
-                })?;
+                }) {
+                    Ok(()) => println!("[hotkey] Ctrl+Alt+O registered"),
+                    Err(e) => eprintln!("[hotkey] Failed to register: {e}. Continuing without hotkey."),
+                }
             }
 
             // Start gateway connection in background
