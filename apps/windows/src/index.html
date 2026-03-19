@@ -1,35 +1,331 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="rog">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenClaw</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #0a0a0a;
-      color: #e0e0e0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-    .container {
-      text-align: center;
-      padding: 2rem;
-    }
-    h1 { color: #ff4655; font-size: 1.5rem; }
-    p { color: #888; font-size: 0.9rem; }
-    .status { color: #4caf50; margin-top: 1rem; }
-  </style>
+  <title>OpenClaw — ROG Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>OpenClaw</h1>
-    <p>AI Assistant for ROG Ally X</p>
-    <p class="status">Running in system tray</p>
-    <p>Press <kbd>Win+Space</kbd> to toggle overlay</p>
-  </div>
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">⚡</div>
+      <span class="logo-text">OpenClaw</span>
+    </div>
+    <div class="nav-items">
+      <button class="nav-item active" data-view="dashboard">
+        <span class="nav-icon">📊</span>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-view="controls">
+        <span class="nav-icon">🎮</span>
+        <span>Controls</span>
+      </button>
+      <button class="nav-item" data-view="overlay">
+        <span class="nav-icon">🖥️</span>
+        <span>Overlay</span>
+      </button>
+      <button class="nav-item" data-view="automation">
+        <span class="nav-icon">⚙️</span>
+        <span>Automation</span>
+      </button>
+      <button class="nav-item" data-view="market">
+        <span class="nav-icon">🛒</span>
+        <span>Market</span>
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="connection-status" id="connStatus">
+        <span class="status-dot"></span>
+        <span>Gateway</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Dashboard View -->
+    <section class="view active" id="view-dashboard">
+      <header class="view-header">
+        <h1>Performance Dashboard</h1>
+        <div class="header-actions">
+          <span class="profile-badge" id="profileBadge">SILENT</span>
+          <span class="game-badge hidden" id="gameBadge">No Game</span>
+        </div>
+      </header>
+
+      <div class="dashboard-grid">
+        <!-- CPU Gauge -->
+        <div class="metric-card">
+          <div class="gauge-container">
+            <svg class="gauge" viewBox="0 0 120 120">
+              <circle class="gauge-bg" cx="60" cy="60" r="52" />
+              <circle class="gauge-fill" id="cpuGauge" cx="60" cy="60" r="52" />
+            </svg>
+            <div class="gauge-label">
+              <span class="gauge-value" id="cpuValue">0</span>
+              <span class="gauge-unit">%</span>
+            </div>
+          </div>
+          <div class="metric-info">
+            <span class="metric-title">CPU</span>
+            <span class="metric-detail" id="cpuTemp">--°C</span>
+          </div>
+        </div>
+
+        <!-- GPU Gauge -->
+        <div class="metric-card">
+          <div class="gauge-container">
+            <svg class="gauge" viewBox="0 0 120 120">
+              <circle class="gauge-bg" cx="60" cy="60" r="52" />
+              <circle class="gauge-fill gpu" id="gpuGauge" cx="60" cy="60" r="52" />
+            </svg>
+            <div class="gauge-label">
+              <span class="gauge-value" id="gpuValue">0</span>
+              <span class="gauge-unit">%</span>
+            </div>
+          </div>
+          <div class="metric-info">
+            <span class="metric-title">GPU</span>
+            <span class="metric-detail" id="gpuTemp">--°C</span>
+          </div>
+        </div>
+
+        <!-- RAM Bar -->
+        <div class="metric-card wide">
+          <div class="bar-metric">
+            <div class="bar-header">
+              <span class="metric-title">RAM</span>
+              <span class="metric-detail" id="ramDetail">0 / 0 GB</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill" id="ramBar" style="width: 0%"></div>
+            </div>
+            <span class="bar-pct" id="ramPct">0%</span>
+          </div>
+        </div>
+
+        <!-- VRAM Bar -->
+        <div class="metric-card wide">
+          <div class="bar-metric">
+            <div class="bar-header">
+              <span class="metric-title">VRAM</span>
+              <span class="metric-detail" id="vramDetail">-- MB</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill accent2" id="vramBar" style="width: 0%"></div>
+            </div>
+            <span class="bar-pct" id="vramPct">--%</span>
+          </div>
+        </div>
+
+        <!-- FPS + Battery -->
+        <div class="metric-card compact">
+          <div class="stat-row">
+            <span class="stat-label">FPS</span>
+            <span class="stat-value" id="fpsValue">--</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Battery</span>
+            <span class="stat-value" id="batValue">--%</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Network</span>
+            <span class="stat-value" id="netValue">↑0 ↓0 KB/s</span>
+          </div>
+        </div>
+
+        <!-- Top Processes -->
+        <div class="metric-card compact">
+          <span class="metric-title">Top Processes</span>
+          <div class="process-list" id="processList">
+            <div class="process-item">
+              <span class="process-name">--</span>
+              <span class="process-cpu">--%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sparkline History -->
+      <div class="history-section">
+        <span class="section-title">History (60s)</span>
+        <div class="sparkline-row">
+          <span class="spark-label">CPU</span>
+          <canvas id="cpuSpark" class="sparkline-canvas" width="300" height="30"></canvas>
+        </div>
+        <div class="sparkline-row">
+          <span class="spark-label">GPU</span>
+          <canvas id="gpuSpark" class="sparkline-canvas" width="300" height="30"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controls View -->
+    <section class="view" id="view-controls">
+      <header class="view-header">
+        <h1>Quick Controls</h1>
+      </header>
+
+      <div class="controls-grid">
+        <!-- Power Profile -->
+        <div class="control-card">
+          <h3>Power Profile</h3>
+          <div class="profile-buttons">
+            <button class="profile-btn" data-profile="silent">
+              <span class="profile-icon">🔇</span>
+              <span>Silent</span>
+            </button>
+            <button class="profile-btn active" data-profile="performance">
+              <span class="profile-icon">⚡</span>
+              <span>Performance</span>
+            </button>
+            <button class="profile-btn" data-profile="turbo">
+              <span class="profile-icon">🔥</span>
+              <span>Turbo</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- RGB Control -->
+        <div class="control-card">
+          <h3>Aura RGB</h3>
+          <div class="rgb-controls">
+            <div class="color-presets">
+              <button class="color-swatch" style="background:#FF0033" data-color="#FF0033"></button>
+              <button class="color-swatch" style="background:#FF4655" data-color="#FF4655"></button>
+              <button class="color-swatch" style="background:#00D4FF" data-color="#00D4FF"></button>
+              <button class="color-swatch" style="background:#00E676" data-color="#00E676"></button>
+              <button class="color-swatch" style="background:#FF00FF" data-color="#FF00FF"></button>
+              <button class="color-swatch" style="background:#FFAB00" data-color="#FFAB00"></button>
+              <button class="color-swatch" style="background:#FFFFFF" data-color="#FFFFFF"></button>
+              <button class="color-swatch off" data-color="off">OFF</button>
+            </div>
+            <div class="mode-select">
+              <select id="auraMode">
+                <option value="static">Static</option>
+                <option value="breathing">Breathing</option>
+                <option value="color-cycle">Color Cycle</option>
+                <option value="rainbow">Rainbow</option>
+                <option value="strobe">Strobe</option>
+              </select>
+            </div>
+            <div class="slider-row">
+              <label>Brightness</label>
+              <input type="range" id="auraBright" min="0" max="3" value="3">
+            </div>
+          </div>
+        </div>
+
+        <!-- Desktop Controls -->
+        <div class="control-card">
+          <h3>Desktop</h3>
+          <div class="desktop-actions">
+            <button class="action-btn" data-action="desktop-left">◀ Prev</button>
+            <button class="action-btn" data-action="desktop-right">Next ▶</button>
+            <button class="action-btn" data-action="desktop-new">+ New</button>
+            <button class="action-btn" data-action="minimize">Minimize All</button>
+          </div>
+        </div>
+
+        <!-- Voice -->
+        <div class="control-card">
+          <h3>Voice</h3>
+          <div class="voice-controls">
+            <button class="action-btn large" id="voiceListenBtn">
+              <span class="mic-icon">🎤</span>
+              <span>Listen</span>
+            </button>
+            <div class="voice-result hidden" id="voiceResult">
+              <p id="voiceText"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Overlay View -->
+    <section class="view" id="view-overlay">
+      <header class="view-header">
+        <h1>Game Overlay</h1>
+        <div class="header-actions">
+          <button class="toggle-btn" id="overlayToggle">OFF</button>
+        </div>
+      </header>
+
+      <div class="overlay-preview">
+        <div class="preview-frame" id="overlayPreview">
+          <div class="hud-line">CPU ████░░░░ 50% 65°C</div>
+          <div class="hud-line">GPU ██████░░ 75% 72°C</div>
+          <div class="hud-line">RAM █████░░░ 62%</div>
+          <div class="hud-line">FPS: 60</div>
+          <div class="hud-line">BAT: 75%</div>
+        </div>
+        <div class="position-grid">
+          <button class="pos-btn active" data-pos="top-left">↖</button>
+          <button class="pos-btn" data-pos="top-right">↗</button>
+          <button class="pos-btn" data-pos="bottom-left">↙</button>
+          <button class="pos-btn" data-pos="bottom-right">↘</button>
+        </div>
+      </div>
+
+      <div class="overlay-stats" id="overlayStats">
+        <h3>Session Statistics</h3>
+        <div class="stats-grid">
+          <div class="stat-cell">
+            <span class="stat-label">Avg CPU</span>
+            <span class="stat-value" id="statAvgCpu">--%</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-label">Avg GPU</span>
+            <span class="stat-value" id="statAvgGpu">--%</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-label">Avg FPS</span>
+            <span class="stat-value" id="statAvgFps">--</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-label">Peak CPU</span>
+            <span class="stat-value" id="statPeakCpu">--%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Automation View -->
+    <section class="view" id="view-automation">
+      <header class="view-header">
+        <h1>Automation Rules</h1>
+        <div class="header-actions">
+          <button class="toggle-btn" id="autoToggle">OFF</button>
+        </div>
+      </header>
+
+      <div class="rules-list" id="rulesList">
+        <!-- Populated by JS -->
+      </div>
+    </section>
+
+    <!-- Market View -->
+    <section class="view" id="view-market">
+      <header class="view-header">
+        <h1>Plugin Marketplace</h1>
+      </header>
+
+      <div class="market-search">
+        <input type="text" id="marketSearch" placeholder="Search plugins...">
+      </div>
+
+      <div class="market-grid" id="marketGrid">
+        <!-- Populated by JS -->
+      </div>
+    </section>
+
+    <!-- Notification Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+  </main>
+
+  <script src="app.js"></script>
 </body>
 </html>
