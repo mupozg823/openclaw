@@ -1,0 +1,15 @@
+{
+  "id": "win-clipboard",
+  "name": "Windows Clipboard & Screenshot",
+  "description": "Read clipboard content, capture screenshots, and analyze images via AI vision.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "screenshotDir": {
+        "type": "string",
+        "description": "Directory to save screenshots (default: ~/Pictures/OpenClaw)"
+      }
+    }
+  }
+}

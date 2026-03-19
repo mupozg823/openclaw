@@ -1,0 +1,11 @@
+{
+  "name": "@openclaw/win-clipboard",
+  "version": "2026.3.14",
+  "description": "OpenClaw Windows clipboard and screenshot analysis plugin",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
