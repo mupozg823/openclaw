@@ -45,6 +45,7 @@ async function runPs(script: string): Promise<string> {
 }
 
 function parseNumber(raw: string): number | null {
+  if (raw === "" || raw == null) return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 }
