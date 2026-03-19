@@ -22,7 +22,7 @@
         "height": 600,
         "minWidth": 640,
         "minHeight": 480,
-        "visible": false,
+        "visible": true,
         "decorations": true,
         "resizable": true,
         "center": true,
