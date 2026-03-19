@@ -3,6 +3,7 @@ use std::time::Duration;
 
 /// Gateway connection state
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum GatewayState {
     Disconnected,
     Connecting,

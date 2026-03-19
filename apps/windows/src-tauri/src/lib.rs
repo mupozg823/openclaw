@@ -1,7 +1,6 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Manager,
 };
 
 mod gateway;
@@ -32,7 +31,7 @@ pub fn run() {
             let _tray = TrayIconBuilder::with_id("main")
                 .tooltip("OpenClaw AI Assistant")
                 .menu(&menu)
-                .menu_on_left_click(true)
+                .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => {
                         app.exit(0);
