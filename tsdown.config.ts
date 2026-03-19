@@ -117,7 +117,9 @@ function listBundledPluginBuildEntries(): Record<string, string> {
     for (const entry of sourceEntries) {
       const normalizedEntry = entry.replace(/^\.\//, "");
       const entryKey = `extensions/${dirent.name}/${normalizedEntry.replace(/\.[^.]+$/u, "")}`;
-      entries[entryKey] = path.join("extensions", dirent.name, normalizedEntry);
+      const entryPath = path.join("extensions", dirent.name, normalizedEntry);
+      // Normalize to forward slashes for cross-platform build compatibility
+      entries[entryKey] = entryPath.replace(/\\/g, "/");
     }
   }
 
@@ -145,7 +147,8 @@ function buildBundledHookEntries(): Record<string, string> {
       continue;
     }
 
-    entries[`bundled/${hookName}/handler`] = handlerPath;
+    // Normalize to forward slashes for cross-platform build compatibility
+    entries[`bundled/${hookName}/handler`] = handlerPath.replace(/\\/g, "/");
   }
 
   return entries;
