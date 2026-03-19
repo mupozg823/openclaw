@@ -236,6 +236,12 @@ $("#overlayToggle").addEventListener("click", () => {
   const btn = $("#overlayToggle");
   btn.textContent = state.overlayOn ? "ON" : "OFF";
   btn.classList.toggle("on", state.overlayOn);
+  // Toggle actual HUD window via Tauri command
+  if (tauriInvoke) {
+    tauriInvoke("toggle_hud", { position: state.overlayPos }).catch((e) =>
+      console.warn("[hud] toggle failed:", e)
+    );
+  }
   sendCommand("rog.overlay.toggle", { enabled: state.overlayOn, position: state.overlayPos });
 });
 
@@ -244,7 +250,13 @@ $$(".pos-btn").forEach((btn) => {
     $$(".pos-btn").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     state.overlayPos = btn.dataset.pos;
-    if (state.overlayOn) sendCommand("rog.overlay.position", { position: state.overlayPos });
+    if (state.overlayOn) {
+      // Reposition HUD window without toggling visibility
+      if (tauriInvoke) {
+        tauriInvoke("set_hud_position", { position: state.overlayPos }).catch(() => {});
+      }
+      sendCommand("rog.overlay.position", { position: state.overlayPos });
+    }
   });
 });
 
@@ -387,16 +399,22 @@ async function pollTelemetry() {
   if (pollBusy) return;
   pollBusy = true;
   try {
+    let data;
     if (tauriInvoke) {
-      const data = await tauriInvoke("get_telemetry");
-      updateDashboard(data);
+      data = await tauriInvoke("get_telemetry");
       setConnectionStatus(true);
     } else {
-      updateDashboard(generateDemoData());
+      data = generateDemoData();
+    }
+    updateDashboard(data);
+    // Emit telemetry to HUD window only when overlay is active
+    if (state.overlayOn && window.__TAURI__) {
+      window.__TAURI__.event.emit("telemetry-update", data).catch(() => {});
     }
   } catch (e) {
     console.warn("[telemetry] poll failed:", e);
-    updateDashboard(generateDemoData());
+    const data = generateDemoData();
+    updateDashboard(data);
   } finally {
     pollBusy = false;
   }
@@ -424,11 +442,196 @@ function generateDemoData() {
   };
 }
 
+// ── AI Chat Panel ────────────────────────────────────────
+const chatPanel = $("#chatPanel");
+const chatFab = $("#chatFab");
+const chatInput = $("#chatInput");
+const chatMessages = $("#chatMessages");
+let chatOpen = false;
+
+function toggleChat(forceOpen) {
+  chatOpen = forceOpen !== undefined ? forceOpen : !chatOpen;
+  chatPanel.classList.toggle("open", chatOpen);
+  chatFab.classList.toggle("hidden", chatOpen);
+  if (chatOpen) chatInput.focus();
+}
+
+chatFab.addEventListener("click", () => toggleChat(true));
+$("#chatCloseBtn").addEventListener("click", () => toggleChat(false));
+
+const MAX_CHAT_MESSAGES = 200;
+
+function addChatMessage(text, role) {
+  const msg = document.createElement("div");
+  msg.className = `chat-msg ${role}`;
+  const bubble = document.createElement("div");
+  bubble.className = "chat-bubble";
+  bubble.textContent = text;
+  msg.appendChild(bubble);
+  chatMessages.appendChild(msg);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  // Prevent unbounded DOM growth
+  while (chatMessages.children.length > MAX_CHAT_MESSAGES) {
+    chatMessages.removeChild(chatMessages.firstChild);
+  }
+  return bubble;
+}
+
+function sendChatMessage(text) {
+  if (!text.trim()) return;
+  addChatMessage(text, "user");
+  chatInput.value = "";
+
+  // Show typing indicator
+  const typingMsg = document.createElement("div");
+  typingMsg.className = "chat-msg ai";
+  const typingBubble = document.createElement("div");
+  typingBubble.className = "chat-bubble typing";
+  typingBubble.textContent = "Thinking";
+  typingMsg.appendChild(typingBubble);
+  chatMessages.appendChild(typingMsg);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  // Send to gateway chat API
+  if (tauriInvoke) {
+    tauriInvoke("send_gateway_command", {
+      method: "chat.send",
+      params: JSON.stringify({ message: text }),
+    })
+      .then((res) => {
+        typingMsg.remove();
+        try {
+          const data = JSON.parse(res);
+          addChatMessage(data.reply || data.queued || "OK", "ai");
+        } catch {
+          addChatMessage(res || "Command sent", "ai");
+        }
+      })
+      .catch((e) => {
+        typingMsg.remove();
+        addChatMessage(`Error: ${e}`, "ai");
+      });
+  } else {
+    // Demo mode: simulate AI response
+    setTimeout(() => {
+      typingMsg.remove();
+      const responses = [
+        "Got it! Profile switched to Turbo.",
+        "RGB turned off. Use 'RGB on' to re-enable.",
+        "Battery at 72%. Estimated 2h 15m remaining.",
+        "Overlay enabled in top-left position.",
+        `CPU: 45°C | GPU: 52°C | RAM: 62% | Profile: ${state.activeProfile}`,
+      ];
+      addChatMessage(responses[Math.floor(Math.random() * responses.length)], "ai");
+    }, 800);
+  }
+}
+
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") sendChatMessage(chatInput.value);
+  if (e.key === "Escape") toggleChat(false);
+});
+
+$("#chatSendBtn").addEventListener("click", () => sendChatMessage(chatInput.value));
+
+// Suggestion chips
+$$(".suggestion-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    sendChatMessage(chip.dataset.msg);
+  });
+});
+
+// Chat voice button
+let chatVoiceListening = false;
+$("#chatVoiceBtn").addEventListener("click", () => {
+  chatVoiceListening = !chatVoiceListening;
+  $("#chatVoiceBtn").classList.toggle("listening", chatVoiceListening);
+  if (chatVoiceListening) {
+    sendCommand("voice.listen", {});
+  } else {
+    sendCommand("voice.stop", {});
+  }
+});
+
+// ── Touch Swipe (left-to-right opens chat) ──────────────
+let touchStartX = 0;
+let touchStartY = 0;
+document.addEventListener("touchstart", (e) => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+document.addEventListener("touchend", (e) => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  // Right-to-left swipe from right edge closes chat
+  if (chatOpen && dx < -60 && Math.abs(dy) < 80) {
+    toggleChat(false);
+  }
+  // Swipe from right edge opens chat
+  if (!chatOpen && touchStartX > window.innerWidth - 40 && dx < -60 && Math.abs(dy) < 80) {
+    toggleChat(true);
+  }
+}, { passive: true });
+
+// ── Gamepad Integration ─────────────────────────────────
+function initGamepad() {
+  if (typeof window.GamepadController === "undefined") return;
+
+  const navItems = Array.from($$(".nav-item"));
+  const controller = new window.GamepadController();
+
+  controller.start({
+    onConfirm: () => {
+      const el = document.activeElement;
+      if (el && typeof el.click === "function") el.click();
+    },
+    onBack: () => {
+      if (chatOpen) {
+        toggleChat(false);
+      } else {
+        // Go to dashboard view
+        navItems[0]?.click();
+      }
+    },
+    onMic: () => {
+      // X button = voice input
+      if (chatOpen) {
+        $("#chatVoiceBtn").click();
+      } else {
+        voiceBtn.click();
+      }
+    },
+    onPalette: () => {
+      // Y button = toggle chat
+      toggleChat();
+    },
+    onPrevTab: () => {
+      // LB = previous sidebar tab
+      const activeIdx = navItems.findIndex((b) => b.classList.contains("active"));
+      const prev = (activeIdx - 1 + navItems.length) % navItems.length;
+      navItems[prev]?.click();
+      navItems[prev]?.focus();
+    },
+    onNextTab: () => {
+      // RB = next sidebar tab
+      const activeIdx = navItems.findIndex((b) => b.classList.contains("active"));
+      const next = (activeIdx + 1) % navItems.length;
+      navItems[next]?.click();
+      navItems[next]?.focus();
+    },
+    onDpad: (dir) => {
+      if (typeof window.moveFocus === "function") window.moveFocus(dir);
+    },
+  });
+}
+
 // ── Init ─────────────────────────────────────────────
 function init() {
   renderRules();
   renderMarketplace();
   initTauri();
+  initGamepad();
 
   // Start telemetry polling (real data via Tauri, fallback to demo)
   setInterval(pollTelemetry, POLL_INTERVAL_MS);

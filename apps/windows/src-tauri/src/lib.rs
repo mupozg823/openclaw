@@ -23,6 +23,23 @@ fn get_telemetry() -> Result<serde_json::Value, String> {
     gateway::collect_telemetry()
 }
 
+fn position_hud_window(win: &tauri::WebviewWindow, pos: &str) {
+    let monitor = win.current_monitor().ok().flatten();
+    if let Some(monitor) = monitor {
+        let size = monitor.size();
+        let w: i32 = 160;
+        let h: i32 = 220;
+        let margin: i32 = 20;
+        let (x, y) = match pos {
+            "top-right" => (size.width as i32 - w - margin, margin),
+            "bottom-left" => (margin, size.height as i32 - h - margin),
+            "bottom-right" => (size.width as i32 - w - margin, size.height as i32 - h - margin),
+            _ => (margin, margin), // top-left default
+        };
+        let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
+    }
+}
+
 #[tauri::command]
 fn toggle_hud(app: tauri::AppHandle, position: Option<String>) -> Result<String, String> {
     if let Some(win) = app.get_webview_window("hud") {
@@ -30,26 +47,22 @@ fn toggle_hud(app: tauri::AppHandle, position: Option<String>) -> Result<String,
             let _ = win.hide();
             Ok("hidden".to_string())
         } else {
-            // Position the HUD window
-            if let Some(pos) = position {
-                let monitor = win.current_monitor().ok().flatten();
-                if let Some(monitor) = monitor {
-                    let size = monitor.size();
-                    let w: i32 = 160;
-                    let h: i32 = 220;
-                    let margin: i32 = 20;
-                    let (x, y) = match pos.as_str() {
-                        "top-right" => (size.width as i32 - w - margin, margin),
-                        "bottom-left" => (margin, size.height as i32 - h - margin),
-                        "bottom-right" => (size.width as i32 - w - margin, size.height as i32 - h - margin),
-                        _ => (margin, margin), // top-left default
-                    };
-                    let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
-                }
+            if let Some(ref pos) = position {
+                position_hud_window(&win, pos);
             }
             let _ = win.show();
             Ok("visible".to_string())
         }
+    } else {
+        Err("HUD window not found".to_string())
+    }
+}
+
+#[tauri::command]
+fn set_hud_position(app: tauri::AppHandle, position: String) -> Result<String, String> {
+    if let Some(win) = app.get_webview_window("hud") {
+        position_hud_window(&win, &position);
+        Ok(format!("positioned: {}", position))
     } else {
         Err("HUD window not found".to_string())
     }
@@ -121,7 +134,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_status, send_gateway_command, get_telemetry, toggle_hud])
+        .invoke_handler(tauri::generate_handler![get_status, send_gateway_command, get_telemetry, toggle_hud, set_hud_position])
         .run(tauri::generate_context!())
         .expect("error while running OpenClaw tray");
 }
