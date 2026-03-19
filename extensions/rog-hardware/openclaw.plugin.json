@@ -1,0 +1,15 @@
+{
+  "id": "rog-hardware",
+  "name": "ROG Hardware Control",
+  "description": "ASUS ROG hardware monitoring and control — performance profiles, CPU/GPU telemetry, battery health, and system info via WMI/Registry.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "monitorIntervalMs": {
+        "type": "number",
+        "description": "Telemetry polling interval in milliseconds (default: 5000)"
+      }
+    }
+  }
+}
