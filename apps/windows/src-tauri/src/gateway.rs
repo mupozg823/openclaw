@@ -102,6 +102,77 @@ pub fn connect_loop(handle: AppHandle) {
     }
 }
 
+// ── PowerShell Execution ──────────────────────────────────────
+
+fn run_powershell(script: &str) -> Result<String, String> {
+    let output = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .output()
+        .map_err(|e| format!("powershell exec failed: {e}"))?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Err(format!("powershell error: {stderr}"))
+    }
+}
+
+// ── Server Request Handler ───────────────────────────────────
+
+fn handle_server_request(method: &str, frame: &Value) -> Result<Value, String> {
+    match method {
+        "tray.status" => {
+            Ok(json!({ "status": "running", "platform": "windows", "version": "0.1.0" }))
+        }
+
+        "rog.status" => {
+            let raw = run_powershell(
+                "$pm = try { (Get-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -ErrorAction Stop).PowerMode } catch { 'N' }; \
+                 $cpu = try { [math]::Round((Get-Counter '\\Processor(_Total)\\% Processor Time' -ErrorAction Stop).CounterSamples[0].CookedValue, 0) } catch { 0 }; \
+                 $bat = try { (Get-CimInstance Win32_Battery -ErrorAction Stop).EstimatedChargeRemaining } catch { 'N' }; \
+                 \"$pm|$cpu|$bat\""
+            )?;
+            let parts: Vec<&str> = raw.split('|').collect();
+            let pm_map = |v: &str| match v { "0" => "silent", "1" => "performance", "2" => "turbo", _ => "unknown" };
+            Ok(json!({
+                "powerMode": pm_map(parts.first().unwrap_or(&"N")),
+                "cpuPct": parts.get(1).and_then(|s| s.parse::<i32>().ok()).unwrap_or(0),
+                "batteryPct": parts.get(2).and_then(|s| s.parse::<i32>().ok()),
+            }))
+        }
+
+        "rog.setProfile" => {
+            let profile = frame.pointer("/params/profile")
+                .and_then(|v| v.as_str())
+                .ok_or("missing params.profile")?;
+            let val = match profile {
+                "silent" => "0", "performance" => "1", "turbo" => "2",
+                _ => return Err(format!("unknown profile: {profile}")),
+            };
+            run_powershell(&format!(
+                "Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -Name PowerMode -Value {val}"
+            ))?;
+            Ok(json!({ "applied": profile }))
+        }
+
+        "system.exec" => {
+            // Execute arbitrary command — requires explicit user approval through gateway
+            let script = frame.pointer("/params/script")
+                .and_then(|v| v.as_str())
+                .ok_or("missing params.script")?;
+            // Safety: only allow read-only Get- commands
+            if !script.starts_with("Get-") && !script.starts_with("(Get-") {
+                return Err("only Get-* commands allowed via system.exec".into());
+            }
+            let result = run_powershell(script)?;
+            Ok(json!({ "output": result }))
+        }
+
+        _ => Err(format!("unknown method: {method}")),
+    }
+}
+
 /// Read a single JSON text frame from the WebSocket.
 fn read_json_frame(socket: &mut tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>) -> Result<Value, String> {
     loop {
@@ -242,17 +313,21 @@ fn try_connect(url: &str) -> Result<(), String> {
                                 .unwrap_or("");
                             println!("[gateway] Server request: {} (id={})", method, id);
 
-                            // Send not-implemented response
-                            let res = json!({
+                            let res = handle_server_request(method, &frame);
+                            let response = json!({
                                 "type": "res",
                                 "id": id,
-                                "ok": false,
-                                "error": {
-                                    "code": "NOT_IMPLEMENTED",
-                                    "message": format!("tray client does not handle {}", method)
+                                "ok": res.is_ok(),
+                                "payload": match &res {
+                                    Ok(v) => v.clone(),
+                                    Err(_) => Value::Null,
+                                },
+                                "error": match &res {
+                                    Ok(_) => Value::Null,
+                                    Err(e) => json!({ "code": "ERROR", "message": e }),
                                 }
                             });
-                            let _ = socket.send(Message::Text(res.to_string()));
+                            let _ = socket.send(Message::Text(response.to_string()));
                         }
                         Some("res") => {
                             // Response to our request

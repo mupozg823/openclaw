@@ -1,0 +1,11 @@
+{
+  "name": "@openclaw/rog-gateway-bridge",
+  "version": "2026.3.19",
+  "description": "OpenClaw ROG gateway bridge - routes tray app commands through WebSocket",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "rog-gateway-bridge",
+  "name": "ROG Gateway Bridge",
+  "description": "Routes commands between the OpenClaw gateway and the ROG tray application.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
