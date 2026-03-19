@@ -15,7 +15,7 @@ pub enum GatewayState {
 
 const GATEWAY_URL: &str = "ws://127.0.0.1:3100/ws";
 const MAX_RETRIES: u32 = 3;
-const PROTOCOL_VERSION: i32 = 1;
+const PROTOCOL_VERSION: i32 = 3;
 
 /// Build the connect params frame per OpenClaw gateway protocol
 fn build_connect_params() -> Value {
@@ -23,12 +23,12 @@ fn build_connect_params() -> Value {
         "minProtocol": PROTOCOL_VERSION,
         "maxProtocol": PROTOCOL_VERSION,
         "client": {
-            "id": "windows-tray",
+            "id": "gateway-client",
             "displayName": "OpenClaw Tray (Windows)",
             "version": env!("CARGO_PKG_VERSION"),
             "platform": "windows",
             "deviceFamily": "ROG Ally X",
-            "mode": "companion"
+            "mode": "cli"
         },
         "caps": ["tray", "hotkey", "rog-hardware"],
         "locale": "ko-KR"
@@ -80,37 +80,95 @@ pub fn connect_loop(handle: AppHandle) {
     }
 }
 
+/// Read a single JSON text frame from the WebSocket.
+fn read_json_frame(socket: &mut tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>) -> Result<Value, String> {
+    loop {
+        let msg = socket.read().map_err(|e| format!("read failed: {e}"))?;
+        match msg {
+            Message::Text(text) => {
+                return serde_json::from_str(&text)
+                    .map_err(|e| format!("JSON parse failed: {e}"));
+            }
+            Message::Ping(data) => {
+                let _ = socket.send(Message::Pong(data));
+            }
+            Message::Close(_) => return Err("connection closed".into()),
+            _ => continue,
+        }
+    }
+}
+
 /// Attempt a single WebSocket connection to the gateway.
 fn try_connect(url: &str) -> Result<(), String> {
     let (mut socket, _response) = connect(url).map_err(|e| format!("connect failed: {e}"))?;
 
-    // Step 1: Send connect params
-    let connect_msg = build_connect_params();
+    // Step 1: Wait for connect.challenge event from server
+    println!("[gateway] Waiting for connect.challenge...");
+    let challenge = read_json_frame(&mut socket)?;
+
+    let event_type = challenge
+        .get("event")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    if event_type == "connect.challenge" {
+        let nonce = challenge
+            .pointer("/payload/nonce")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        println!("[gateway] Got challenge nonce={}", &nonce[..8.min(nonce.len())]);
+    } else {
+        println!("[gateway] No challenge received (got event={}), continuing anyway", event_type);
+    }
+
+    // Step 2: Send connect request frame: { type:"req", method:"connect", params: ConnectParams }
+    let connect_frame = json!({
+        "type": "req",
+        "id": Uuid::new_v4().to_string(),
+        "method": "connect",
+        "params": build_connect_params()
+    });
     socket
-        .send(Message::Text(connect_msg.to_string()))
-        .map_err(|e| format!("send connect params failed: {e}"))?;
+        .send(Message::Text(connect_frame.to_string()))
+        .map_err(|e| format!("send connect frame failed: {e}"))?;
 
     println!("[gateway] Connect params sent, waiting for hello-ok...");
 
-    // Step 2: Wait for hello-ok
-    let hello = socket
-        .read()
-        .map_err(|e| format!("read hello-ok failed: {e}"))?;
-
-    let hello_text = match &hello {
-        Message::Text(t) => t.clone(),
-        _ => return Err("expected text frame for hello-ok".into()),
+    // Step 3: Wait for hello-ok (skip any intermediate events)
+    let hello_json = loop {
+        let frame = read_json_frame(&mut socket)?;
+        match frame.get("type").and_then(|v| v.as_str()) {
+            Some("hello-ok") => break frame,
+            Some("event") => {
+                let ev = frame.get("event").and_then(|v| v.as_str()).unwrap_or("?");
+                println!("[gateway] Skipping event during handshake: {}", ev);
+                continue;
+            }
+            Some("res") => {
+                // Server responded to our connect request — check if it's an error
+                let ok = frame.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+                if !ok {
+                    let err_msg = frame
+                        .pointer("/error/message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown error");
+                    let err_code = frame
+                        .pointer("/error/code")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    return Err(format!("connect rejected: [{}] {}", err_code, err_msg));
+                }
+                // ok=true res without hello-ok type — might be the hello-ok in disguise
+                println!("[gateway] Got res ok=true, checking for hello-ok fields...");
+                if frame.get("server").is_some() {
+                    break frame;
+                }
+                continue;
+            }
+            Some(t) => return Err(format!("unexpected frame during handshake: {}", t)),
+            None => continue,
+        }
     };
-
-    let hello_json: Value =
-        serde_json::from_str(&hello_text).map_err(|e| format!("parse hello-ok failed: {e}"))?;
-
-    if hello_json.get("type").and_then(|v| v.as_str()) != Some("hello-ok") {
-        return Err(format!(
-            "unexpected frame type: {}",
-            hello_json.get("type").unwrap_or(&Value::Null)
-        ));
-    }
 
     let conn_id = hello_json
         .pointer("/server/connId")
