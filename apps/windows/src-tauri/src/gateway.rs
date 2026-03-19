@@ -17,18 +17,17 @@ const GATEWAY_URL: &str = "ws://127.0.0.1:3100/ws";
 const MAX_RETRIES: u32 = 3;
 const PROTOCOL_VERSION: i32 = 3;
 
-/// Load device auth token from ~/.openclaw/identity/device-auth.json
-fn load_device_token() -> Option<String> {
+/// Load gateway auth token from ~/.openclaw/openclaw.json
+fn load_gateway_auth_token() -> Option<String> {
     let home = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .ok()?;
     let path = std::path::Path::new(&home)
         .join(".openclaw")
-        .join("identity")
-        .join("device-auth.json");
+        .join("openclaw.json");
     let content = std::fs::read_to_string(path).ok()?;
     let json: Value = serde_json::from_str(&content).ok()?;
-    json.pointer("/tokens/operator/token")
+    json.pointer("/gateway/auth/token")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
 }
@@ -50,9 +49,9 @@ fn build_connect_params() -> Value {
         "locale": "ko-KR"
     });
 
-    if let Some(token) = load_device_token() {
-        params["auth"] = json!({ "deviceToken": token });
-        println!("[gateway] Using device auth token");
+    if let Some(token) = load_gateway_auth_token() {
+        params["auth"] = json!({ "token": token });
+        println!("[gateway] Using gateway auth token");
     }
 
     params
@@ -181,12 +180,19 @@ fn try_connect(url: &str) -> Result<(), String> {
                         .unwrap_or("?");
                     return Err(format!("connect rejected: [{}] {}", err_code, err_msg));
                 }
-                // ok=true res without hello-ok type — might be the hello-ok in disguise
-                println!("[gateway] Got res ok=true, checking for hello-ok fields...");
-                if frame.get("server").is_some() {
-                    break frame;
-                }
-                continue;
+                // The hello-ok data may be in the payload field or at the top level
+                println!("[gateway] Got res ok=true");
+                // Extract hello-ok from payload or top-level
+                let hello = if let Some(payload) = frame.get("payload") {
+                    if payload.get("server").is_some() {
+                        payload.clone()
+                    } else {
+                        frame.clone()
+                    }
+                } else {
+                    frame.clone()
+                };
+                break hello;
             }
             Some(t) => return Err(format!("unexpected frame during handshake: {}", t)),
             None => continue,
