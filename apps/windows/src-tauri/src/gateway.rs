@@ -17,9 +17,25 @@ const GATEWAY_URL: &str = "ws://127.0.0.1:3100/ws";
 const MAX_RETRIES: u32 = 3;
 const PROTOCOL_VERSION: i32 = 3;
 
+/// Load device auth token from ~/.openclaw/identity/device-auth.json
+fn load_device_token() -> Option<String> {
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()?;
+    let path = std::path::Path::new(&home)
+        .join(".openclaw")
+        .join("identity")
+        .join("device-auth.json");
+    let content = std::fs::read_to_string(path).ok()?;
+    let json: Value = serde_json::from_str(&content).ok()?;
+    json.pointer("/tokens/operator/token")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
 /// Build the connect params frame per OpenClaw gateway protocol
 fn build_connect_params() -> Value {
-    json!({
+    let mut params = json!({
         "minProtocol": PROTOCOL_VERSION,
         "maxProtocol": PROTOCOL_VERSION,
         "client": {
@@ -32,7 +48,14 @@ fn build_connect_params() -> Value {
         },
         "caps": ["tray", "hotkey", "rog-hardware"],
         "locale": "ko-KR"
-    })
+    });
+
+    if let Some(token) = load_device_token() {
+        params["auth"] = json!({ "deviceToken": token });
+        println!("[gateway] Using device auth token");
+    }
+
+    params
 }
 
 /// Build a JSON-RPC style request frame
