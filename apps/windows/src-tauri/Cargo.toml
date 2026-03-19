@@ -1,0 +1,18 @@
+[package]
+name = "openclaw-tray"
+version = "0.1.0"
+edition = "2021"
+description = "OpenClaw system tray for Windows — ROG Ally X AI assistant"
+
+[lib]
+name = "openclaw_tray_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
