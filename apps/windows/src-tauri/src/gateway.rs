@@ -13,7 +13,7 @@ pub enum GatewayState {
     Connected,
 }
 
-const GATEWAY_URL: &str = "ws://127.0.0.1:3100/ws";
+const GATEWAY_URL: &str = "ws://127.0.0.1:18789/ws";
 const MAX_RETRIES: u32 = 3;
 const PROTOCOL_VERSION: i32 = 3;
 
