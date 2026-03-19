@@ -13,7 +13,22 @@
       "iconPath": "icons/icon.png",
       "tooltip": "OpenClaw AI Assistant"
     },
-    "windows": []
+    "windows": [
+      {
+        "label": "dashboard",
+        "title": "OpenClaw — ROG Dashboard",
+        "url": "index.html",
+        "width": 820,
+        "height": 600,
+        "minWidth": 640,
+        "minHeight": 480,
+        "visible": false,
+        "decorations": true,
+        "resizable": true,
+        "center": true,
+        "transparent": false
+      }
+    ]
   },
   "bundle": {
     "active": true,

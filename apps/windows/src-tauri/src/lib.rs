@@ -1,6 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
+    Manager,
 };
 
 mod gateway;
@@ -10,21 +11,39 @@ fn get_status() -> String {
     "OpenClaw tray is running".to_string()
 }
 
+#[tauri::command]
+fn send_gateway_command(method: String, params: String) -> Result<String, String> {
+    // TODO: Forward to gateway WebSocket once bidirectional channel is wired
+    println!("[tauri-cmd] {} params={}", method, params);
+    Ok(format!("{{\"queued\":\"{}\"}}", method))
+}
+
+/// Toggle the dashboard window visibility
+fn toggle_dashboard(app: &tauri::AppHandle) {
+    if let Some(win) = app.get_webview_window("dashboard") {
+        if win.is_visible().unwrap_or(false) {
+            let _ = win.hide();
+        } else {
+            let _ = win.show();
+            let _ = win.set_focus();
+        }
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             // Build tray menu
-            let status_item = MenuItem::with_id(app, "status", "OpenClaw AI", true, None::<&str>)?;
+            let dashboard_item = MenuItem::with_id(app, "dashboard", "Dashboard (Ctrl+Alt+O)", true, None::<&str>)?;
             let separator = MenuItem::with_id(app, "sep", "---", false, None::<&str>)?;
-            let rog_item = MenuItem::with_id(app, "rog_status", "ROG Status", true, None::<&str>)?;
             let gateway_item =
                 MenuItem::with_id(app, "gateway", "Gateway: Disconnected", false, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit OpenClaw", true, None::<&str>)?;
 
             let menu = Menu::with_items(
                 app,
-                &[&status_item, &separator, &rog_item, &gateway_item, &quit_item],
+                &[&dashboard_item, &separator, &gateway_item, &quit_item],
             )?;
 
             // Create tray icon
@@ -36,9 +55,8 @@ pub fn run() {
                     "quit" => {
                         app.exit(0);
                     }
-                    "rog_status" => {
-                        // TODO: Invoke rog-hardware telemetry via gateway
-                        println!("ROG status requested");
+                    "rog_status" | "dashboard" => {
+                        toggle_dashboard(app);
                     }
                     _ => {}
                 })
@@ -51,8 +69,7 @@ pub fn run() {
 
                 let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyO);
                 match app.global_shortcut().on_shortcut(shortcut, |app, _shortcut, _event| {
-                    println!("Ctrl+Alt+O triggered — toggle OpenClaw overlay");
-                    let _ = app;
+                    toggle_dashboard(app);
                 }) {
                     Ok(()) => println!("[hotkey] Ctrl+Alt+O registered"),
                     Err(e) => eprintln!("[hotkey] Failed to register: {e}. Continuing without hotkey."),
@@ -67,7 +84,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_status])
+        .invoke_handler(tauri::generate_handler![get_status, send_gateway_command])
         .run(tauri::generate_context!())
         .expect("error while running OpenClaw tray");
 }
