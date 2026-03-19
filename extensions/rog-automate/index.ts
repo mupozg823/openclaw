@@ -1,9 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import {
-  definePluginEntry,
-  type OpenClawPluginApi,
-} from "openclaw/plugin-sdk/phone-control";
+import { definePluginEntry } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 
 const execFileAsync = promisify(execFile);
 
@@ -50,6 +48,17 @@ async function runPs(script: string): Promise<string> {
     PS_OPTS,
   );
   return stdout.trim();
+}
+
+async function isAdmin(): Promise<boolean> {
+  try {
+    const raw = await runPs(
+      `([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)`,
+    );
+    return raw.trim() === "True";
+  } catch {
+    return false;
+  }
 }
 
 // ── Process Detection ────────────────────────────────────────
@@ -177,6 +186,9 @@ function formatHelp(): string {
 }
 
 // ── Plugin Entry ─────────────────────────────────────────────
+
+export { findMatchingRule };
+export type { AutoRule, PowerProfile };
 
 export default definePluginEntry({
   id: "rog-automate",

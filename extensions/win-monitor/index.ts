@@ -1,9 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import {
-  definePluginEntry,
-  type OpenClawPluginApi,
-} from "openclaw/plugin-sdk/phone-control";
+import { definePluginEntry } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 
 const execFileAsync = promisify(execFile);
 
@@ -343,6 +341,8 @@ function recordHistory(s: SystemSnapshot): void {
 }
 
 // ── Plugin Entry ─────────────────────────────────────────────
+
+export { bar, sparkline };
 
 export default definePluginEntry({
   id: "win-monitor",

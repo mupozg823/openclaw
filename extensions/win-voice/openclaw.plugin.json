@@ -1,0 +1,19 @@
+{
+  "id": "win-voice",
+  "name": "Windows Voice I/O",
+  "description": "Speech-to-text recognition and text-to-speech synthesis using Windows System.Speech.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "defaultVoice": {
+        "type": "string",
+        "description": "Default TTS voice name (e.g., 'Microsoft Zira Desktop')"
+      },
+      "listenTimeoutSec": {
+        "type": "number",
+        "description": "Speech recognition timeout in seconds (default: 10)"
+      }
+    }
+  }
+}

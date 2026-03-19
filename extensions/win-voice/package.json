@@ -1,0 +1,11 @@
+{
+  "name": "@openclaw/win-voice",
+  "version": "2026.3.19",
+  "description": "OpenClaw Windows Voice I/O - speech-to-text and text-to-speech via System.Speech",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

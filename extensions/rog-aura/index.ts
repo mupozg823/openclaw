@@ -1,9 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import {
-  definePluginEntry,
-  type OpenClawPluginApi,
-} from "openclaw/plugin-sdk/phone-control";
+import { definePluginEntry } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 
 const execFileAsync = promisify(execFile);
 
@@ -20,8 +18,11 @@ interface AuraState {
 
 // ── Constants ────────────────────────────────────────────────
 
-const AURA_REG_PATH =
-  "HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\AuraService";
+const AURA_REG_CANDIDATES = [
+  "HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\AuraService",
+  "HKLM:\\SOFTWARE\\ASUS\\AsRogAuraServiceSDK",
+  "HKLM:\\SOFTWARE\\ASUS\\AURA lighting effect add-on x64",
+] as const;
 
 const MODE_MAP: Record<string, AuraMode> = {
   "0": "static",
@@ -74,12 +75,48 @@ async function runPs(script: string): Promise<string> {
   return stdout.trim();
 }
 
+async function isAdmin(): Promise<boolean> {
+  try {
+    const raw = await runPs(
+      `([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)`,
+    );
+    return raw.trim() === "True";
+  } catch {
+    return false;
+  }
+}
+
+// ── Registry Path Resolution ─────────────────────────────────
+
+let cachedAuraPath: string | null | undefined;
+
+async function resolveAuraRegPath(): Promise<string | null> {
+  if (cachedAuraPath !== undefined) return cachedAuraPath;
+  for (const candidate of AURA_REG_CANDIDATES) {
+    try {
+      const raw = await runPs(
+        `(Get-ItemProperty '${candidate}' -Name LedMode -ErrorAction Stop).LedMode`,
+      );
+      if (raw.trim() !== "") {
+        cachedAuraPath = candidate;
+        return candidate;
+      }
+    } catch {
+      // try next
+    }
+  }
+  cachedAuraPath = null;
+  return null;
+}
+
 // ── Read State ───────────────────────────────────────────────
 
 async function readAuraState(): Promise<AuraState | null> {
+  const regPath = await resolveAuraRegPath();
+  if (!regPath) return null;
   try {
     const raw = await runPs(`
-$p = '${AURA_REG_PATH}'
+$p = '${regPath}'
 $mode = (Get-ItemProperty $p -Name LedMode -ErrorAction Stop).LedMode
 $r = (Get-ItemProperty $p -Name LedColorR -ErrorAction SilentlyContinue).LedColorR
 $g = (Get-ItemProperty $p -Name LedColorG -ErrorAction SilentlyContinue).LedColorG
@@ -114,9 +151,11 @@ if ($speed -eq $null) { $speed = 1 }
 async function setAuraMode(mode: AuraMode): Promise<boolean> {
   const val = MODE_TO_VALUE[mode];
   if (val == null) return false;
+  const regPath = await resolveAuraRegPath();
+  if (!regPath) return false;
   try {
     await runPs(
-      `Set-ItemProperty '${AURA_REG_PATH}' -Name LedMode -Value ${val} -ErrorAction Stop`,
+      `Set-ItemProperty '${regPath}' -Name LedMode -Value ${val} -ErrorAction Stop`,
     );
     return true;
   } catch {
@@ -131,9 +170,11 @@ async function setAuraColor(hex: string): Promise<boolean> {
   const r = parseInt(rH!, 16);
   const g = parseInt(gH!, 16);
   const b = parseInt(bH!, 16);
+  const regPath = await resolveAuraRegPath();
+  if (!regPath) return false;
   try {
     await runPs(`
-$p = '${AURA_REG_PATH}'
+$p = '${regPath}'
 Set-ItemProperty $p -Name LedColorR -Value ${r}
 Set-ItemProperty $p -Name LedColorG -Value ${g}
 Set-ItemProperty $p -Name LedColorB -Value ${b}
@@ -146,9 +187,11 @@ Set-ItemProperty $p -Name LedColorB -Value ${b}
 
 async function setAuraBrightness(level: number): Promise<boolean> {
   if (level < 0 || level > 3) return false;
+  const regPath = await resolveAuraRegPath();
+  if (!regPath) return false;
   try {
     await runPs(
-      `Set-ItemProperty '${AURA_REG_PATH}' -Name Brightness -Value ${level} -ErrorAction Stop`,
+      `Set-ItemProperty '${regPath}' -Name Brightness -Value ${level} -ErrorAction Stop`,
     );
     return true;
   } catch {
@@ -158,9 +201,11 @@ async function setAuraBrightness(level: number): Promise<boolean> {
 
 async function setAuraSpeed(level: number): Promise<boolean> {
   if (level < 0 || level > 2) return false;
+  const regPath = await resolveAuraRegPath();
+  if (!regPath) return false;
   try {
     await runPs(
-      `Set-ItemProperty '${AURA_REG_PATH}' -Name Speed -Value ${level} -ErrorAction Stop`,
+      `Set-ItemProperty '${regPath}' -Name Speed -Value ${level} -ErrorAction Stop`,
     );
     return true;
   } catch {
@@ -170,18 +215,22 @@ async function setAuraSpeed(level: number): Promise<boolean> {
 
 // ── Formatting ───────────────────────────────────────────────
 
-function formatState(s: AuraState): string {
+function formatState(s: AuraState, regPath: string): string {
   return [
     `Mode: ${s.mode.toUpperCase()}`,
     `Color: ${s.color}`,
     `Brightness: ${BRIGHTNESS_LABELS[s.brightness] ?? s.brightness} (${s.brightness}/3)`,
     `Speed: ${SPEED_LABELS[s.speed] ?? s.speed} (${s.speed}/2)`,
+    `Registry: ${regPath}`,
   ].join("\n");
 }
 
-function formatHelp(): string {
+function formatHelp(regPath: string | null): string {
   const modes = Object.keys(MODE_TO_VALUE).join(", ");
   const colors = Object.keys(NAMED_COLORS).join(", ");
+  const pathLine = regPath
+    ? `Registry path: ${regPath}`
+    : "Registry path: not found (LedMode key missing in all candidate paths)";
   return [
     "ROG Aura Sync RGB commands:",
     "",
@@ -194,10 +243,14 @@ function formatHelp(): string {
     "/aura rog — Set ROG Republic Red static",
     "",
     `Named colors: ${colors}`,
+    "",
+    pathLine,
   ].join("\n");
 }
 
 // ── Plugin Entry ─────────────────────────────────────────────
+
+export { NAMED_COLORS, MODE_TO_VALUE };
 
 export default definePluginEntry({
   id: "rog-aura",
@@ -213,7 +266,10 @@ export default definePluginEntry({
         const tokens = args.split(/\s+/).filter(Boolean);
         const action = tokens[0]?.toLowerCase() ?? "";
 
-        if (action === "help") return { text: formatHelp() };
+        if (action === "help") {
+          const regPath = await resolveAuraRegPath();
+          return { text: formatHelp(regPath) };
+        }
 
         // /aura off — shortcut
         if (action === "off") {
@@ -283,11 +339,22 @@ export default definePluginEntry({
         }
 
         // Default: show current state
+        const regPath = await resolveAuraRegPath();
+        if (!regPath) {
+          return {
+            text: [
+              "Could not read Aura Sync state. LedMode key not found in any candidate registry path.",
+              "",
+              "Checked paths:",
+              ...AURA_REG_CANDIDATES.map((p) => `  ${p}`),
+            ].join("\n"),
+          };
+        }
         const state = await readAuraState();
         if (!state) {
-          return { text: "Could not read Aura Sync state. Armoury Crate may not be installed." };
+          return { text: "Could not read Aura Sync state. Registry path found but read failed." };
         }
-        return { text: formatState(state) };
+        return { text: formatState(state, regPath) };
       },
     });
   },

@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
-} from "openclaw/plugin-sdk/phone-control";
+} from "openclaw/plugin-sdk/core";
 
 const execFileAsync = promisify(execFile);
 

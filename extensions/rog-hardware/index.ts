@@ -3,8 +3,7 @@ import { promisify } from "node:util";
 import {
   definePluginEntry,
   type OpenClawPluginApi,
-  type OpenClawPluginService,
-} from "openclaw/plugin-sdk/phone-control";
+} from "openclaw/plugin-sdk/core";
 
 const execFileAsync = promisify(execFile);
 
@@ -50,6 +49,19 @@ function parseNumber(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// ── Admin Detection ───────────────────────────────────────────
+
+async function isAdmin(): Promise<boolean> {
+  try {
+    const raw = await runPs(
+      `([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')`,
+    );
+    return raw.trim() === "True";
+  } catch {
+    return false;
+  }
+}
+
 // ── ROG Detection ────────────────────────────────────────────
 
 async function detectRogDevice(): Promise<{ isRog: boolean; model: string | null }> {
@@ -83,16 +95,19 @@ async function getPowerMode(): Promise<PowerMode> {
   }
 }
 
-async function setPowerMode(mode: PowerMode): Promise<boolean> {
+async function setPowerMode(mode: PowerMode): Promise<{ ok: boolean; error?: string }> {
   const modeValue = Object.entries(POWER_MODE_MAP).find(([, v]) => v === mode)?.[0];
-  if (modeValue == null) return false;
+  if (modeValue == null) return { ok: false, error: `Unknown mode: ${mode}` };
+  if (!(await isAdmin())) {
+    return { ok: false, error: "Administrator privileges required. Run OpenClaw as admin to change power profiles." };
+  }
   try {
     await runPs(
       `Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -Name PowerMode -Value ${modeValue}`,
     );
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: `Registry write failed: ${e}` };
   }
 }
 
@@ -263,9 +278,9 @@ export default definePluginEntry({
           if (target !== "silent" && target !== "performance" && target !== "turbo") {
             return { text: "Usage: /rog profile <silent|performance|turbo>" };
           }
-          const ok = await setPowerMode(target);
-          if (!ok) {
-            return { text: `Failed to switch to ${target}. Admin privileges may be required.` };
+          const result = await setPowerMode(target);
+          if (!result.ok) {
+            return { text: result.error ?? "Failed to switch profile." };
           }
           return { text: `Performance profile switched to ${target.toUpperCase()}.` };
         }
@@ -298,3 +313,6 @@ export default definePluginEntry({
     });
   },
 });
+
+export { formatHelp, formatStatus, formatTelemetry, parseNumber, POWER_MODE_MAP };
+export type { PowerMode, RogStatus, RogTelemetry };

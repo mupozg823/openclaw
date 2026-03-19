@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTestPluginApi } from "../../test/helpers/extensions/plugin-api.js";
 
-describe("win-monitor plugin", () => {
-  it("registers the /monitor command", async () => {
+describe("win-voice plugin", () => {
+  it("registers the /voice command", async () => {
     vi.resetModules();
     const { default: plugin } = await import("./index.js");
 
     let command: any;
     plugin.register(
       createTestPluginApi({
-        id: "win-monitor",
-        name: "Windows System Monitor",
+        id: "win-voice",
+        name: "Windows Voice I/O",
         source: "test",
         config: {},
         pluginConfig: {},
@@ -22,19 +22,19 @@ describe("win-monitor plugin", () => {
       }),
     );
 
-    expect(command?.name).toBe("monitor");
+    expect(command?.name).toBe("voice");
     expect(command?.acceptsArgs).toBe(true);
   });
 
-  it("returns help text", async () => {
+  it("returns help text with all commands", async () => {
     vi.resetModules();
     const { default: plugin } = await import("./index.js");
 
     let command: any;
     plugin.register(
       createTestPluginApi({
-        id: "win-monitor",
-        name: "Windows System Monitor",
+        id: "win-voice",
+        name: "Windows Voice I/O",
         source: "test",
         config: {},
         pluginConfig: {},
@@ -49,7 +49,7 @@ describe("win-monitor plugin", () => {
     const result = await command.handler({
       channel: "test",
       isAuthorizedSender: true,
-      commandBody: "/monitor help",
+      commandBody: "/voice help",
       args: "help",
       config: {},
       requestConversationBinding: async () => ({ status: "error" as const }),
@@ -58,35 +58,30 @@ describe("win-monitor plugin", () => {
     });
 
     const text = String(result?.text ?? "");
-    expect(text).toContain("System Monitor commands");
-    expect(text).toContain("/monitor cpu");
-    expect(text).toContain("/monitor gpu");
-    expect(text).toContain("/monitor ram");
+    expect(text).toContain("/voice say");
+    expect(text).toContain("/voice listen");
+    expect(text).toContain("/voice save");
+    expect(text).toContain("/voice voices");
   });
 
-  it("bar() renders progress bar correctly", async () => {
+  it("formatVoiceList handles empty array", async () => {
     vi.resetModules();
-    const { bar } = await import("./index.js");
+    const { formatVoiceList } = await import("./index.js");
 
-    const result0 = bar(0);
-    expect(result0).toContain("0%");
-    expect(result0).toContain("░");
-
-    const result100 = bar(100);
-    expect(result100).toContain("100%");
-    expect(result100).toContain("█");
-
-    const result50 = bar(50, 10);
-    expect(result50).toContain("50%");
+    expect(formatVoiceList([])).toBe("No TTS voices installed.");
   });
 
-  it("sparkline() renders trend correctly", async () => {
+  it("formatVoiceList formats voices correctly", async () => {
     vi.resetModules();
-    const { sparkline } = await import("./index.js");
+    const { formatVoiceList } = await import("./index.js");
 
-    const result = sparkline([0, 50, 100], 100);
-    expect(result.length).toBe(3);
-    expect(result[0]).toBe(" "); // 0/100
-    expect(result[2]).toBe("█"); // 100/100
+    const voices = [
+      { name: "Microsoft Zira Desktop", culture: "en-US", gender: "Female" },
+      { name: "Microsoft Heami Desktop", culture: "ko-KR", gender: "Female" },
+    ];
+    const result = formatVoiceList(voices);
+    expect(result).toContain("Installed voices (2)");
+    expect(result).toContain("Zira");
+    expect(result).toContain("ko-KR");
   });
 });

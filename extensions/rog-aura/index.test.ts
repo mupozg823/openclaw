@@ -62,4 +62,24 @@ describe("rog-aura plugin", () => {
     expect(text).toContain("/aura color");
     expect(text).toContain("rog");
   });
+
+  it("NAMED_COLORS has valid hex values", async () => {
+    vi.resetModules();
+    const { NAMED_COLORS } = await import("./index.js");
+
+    for (const [, hex] of Object.entries(NAMED_COLORS)) {
+      expect(hex).toMatch(/^#[0-9A-Fa-f]{6}$/);
+    }
+    expect(NAMED_COLORS.rog).toBe("#FF4655");
+  });
+
+  it("MODE_TO_VALUE covers all modes", async () => {
+    vi.resetModules();
+    const { MODE_TO_VALUE } = await import("./index.js");
+
+    expect(MODE_TO_VALUE).toHaveProperty("static");
+    expect(MODE_TO_VALUE).toHaveProperty("breathing");
+    expect(MODE_TO_VALUE).toHaveProperty("off");
+    expect(Object.keys(MODE_TO_VALUE).length).toBe(6);
+  });
 });
