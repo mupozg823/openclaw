@@ -1,0 +1,15 @@
+{
+  "id": "win-monitor",
+  "name": "Windows System Monitor",
+  "description": "Real-time CPU, GPU, RAM, disk, and network monitoring dashboard for Windows.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "historySize": {
+        "type": "number",
+        "description": "Number of history entries to retain (default: 30)"
+      }
+    }
+  }
+}
