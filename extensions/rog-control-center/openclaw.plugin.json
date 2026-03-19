@@ -1,0 +1,15 @@
+{
+  "id": "rog-control-center",
+  "name": "ROG Control Center",
+  "description": "Unified control center for all ROG and Windows plugins — integrated status dashboard, quick presets, system health checks, and plugin inventory.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "defaultPreset": {
+        "type": "string",
+        "description": "Default quick preset to apply on startup (gaming|battery|quiet|presentation)"
+      }
+    }
+  }
+}

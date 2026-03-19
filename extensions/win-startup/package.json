@@ -1,0 +1,7 @@
+{
+  "name": "@openclaw/win-startup",
+  "version": "2026.3.19",
+  "description": "OpenClaw Windows OS integration - autostart, context menu, system tray, services",
+  "type": "module",
+  "openclaw": { "extensions": ["./index.ts"] }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "@openclaw/rog-fan",
+  "version": "2026.3.19",
+  "description": "OpenClaw ROG fan curve control and thermal monitoring",
+  "type": "module",
+  "openclaw": { "extensions": ["./index.ts"] }
+}

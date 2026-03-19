@@ -1,0 +1,15 @@
+{
+  "id": "win-startup",
+  "name": "Windows OS Integration",
+  "description": "Windows OS integration — autostart management, system information, ASUS service status, and environment diagnostics.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "autoStartEnabled": {
+        "type": "boolean",
+        "description": "Whether OpenClaw is registered for Windows autostart (informational, managed via /system autostart)"
+      }
+    }
+  }
+}

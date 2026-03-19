@@ -1,0 +1,21 @@
+{
+  "id": "rog-fan",
+  "name": "ROG Fan Control",
+  "description": "Fan curve control and thermal monitoring for ASUS ROG devices",
+  "version": "2026.3.19",
+  "author": "OpenClaw",
+  "commands": ["/fan"],
+  "config": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "defaultMode": {
+          "type": "string",
+          "enum": ["auto", "silent", "turbo"],
+          "default": "auto",
+          "description": "Default fan mode on startup"
+        }
+      }
+    }
+  }
+}

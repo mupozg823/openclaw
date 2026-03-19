@@ -1,0 +1,15 @@
+{
+  "id": "win-gamepad",
+  "name": "Gamepad Commander",
+  "description": "Map gamepad buttons to OpenClaw commands via XInput. Supports ROG Ally X and any XInput-compatible controller.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "controllerIndex": {
+        "type": "number",
+        "description": "XInput controller index to use (0-3, default: 0)"
+      }
+    }
+  }
+}
