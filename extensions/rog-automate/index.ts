@@ -11,32 +11,38 @@ const execFileAsync = promisify(execFile);
 
 type PowerProfile = "silent" | "performance" | "turbo";
 
+type AuraMode = "static" | "breathing" | "color-cycle" | "rainbow" | "strobe" | "off";
+
 interface AutoRule {
   id: string;
   name: string;
   processNames: string[];
   profile: PowerProfile;
   enabled: boolean;
+  rgbMode?: AuraMode;
+  rgbColor?: string; // hex "#RRGGBB"
+  rgbBrightness?: number; // 0-3
+  fanMode?: "auto" | "silent" | "turbo";
 }
 
 // ── Built-in game/app rules ──────────────────────────────────
 
 const BUILTIN_RULES: AutoRule[] = [
-  { id: "steam-games", name: "Steam Games", processNames: ["steam_osc", "steamwebhelper"], profile: "performance", enabled: true },
-  { id: "cyberpunk", name: "Cyberpunk 2077", processNames: ["Cyberpunk2077"], profile: "turbo", enabled: true },
-  { id: "elden-ring", name: "Elden Ring", processNames: ["eldenring"], profile: "turbo", enabled: true },
-  { id: "baldurs-gate", name: "Baldur's Gate 3", processNames: ["bg3", "bg3_dx11"], profile: "turbo", enabled: true },
-  { id: "genshin", name: "Genshin Impact", processNames: ["GenshinImpact", "YuanShen"], profile: "performance", enabled: true },
-  { id: "fortnite", name: "Fortnite", processNames: ["FortniteClient-Win64-Shipping"], profile: "turbo", enabled: true },
-  { id: "valorant", name: "Valorant", processNames: ["VALORANT-Win64-Shipping"], profile: "turbo", enabled: true },
-  { id: "cod", name: "Call of Duty", processNames: ["cod", "ModernWarfare"], profile: "turbo", enabled: true },
-  { id: "apex", name: "Apex Legends", processNames: ["r5apex"], profile: "turbo", enabled: true },
-  { id: "lol", name: "League of Legends", processNames: ["League of Legends"], profile: "performance", enabled: true },
-  { id: "obs", name: "OBS Studio", processNames: ["obs64"], profile: "performance", enabled: true },
-  { id: "premiere", name: "Adobe Premiere", processNames: ["Adobe Premiere Pro"], profile: "turbo", enabled: true },
-  { id: "davinci", name: "DaVinci Resolve", processNames: ["Resolve"], profile: "turbo", enabled: true },
-  { id: "blender", name: "Blender", processNames: ["blender"], profile: "turbo", enabled: true },
-  { id: "vscode", name: "VS Code (light)", processNames: ["Code"], profile: "silent", enabled: false },
+  { id: "steam-games", name: "Steam Games", processNames: ["steam_osc", "steamwebhelper"], profile: "performance", enabled: true, rgbMode: "breathing", rgbColor: "#00D4FF", rgbBrightness: 2 },
+  { id: "cyberpunk", name: "Cyberpunk 2077", processNames: ["Cyberpunk2077"], profile: "turbo", enabled: true, rgbMode: "static", rgbColor: "#FFFF00", rgbBrightness: 3, fanMode: "turbo" },
+  { id: "elden-ring", name: "Elden Ring", processNames: ["eldenring"], profile: "turbo", enabled: true, rgbMode: "breathing", rgbColor: "#FFD700", rgbBrightness: 3, fanMode: "turbo" },
+  { id: "baldurs-gate", name: "Baldur's Gate 3", processNames: ["bg3", "bg3_dx11"], profile: "turbo", enabled: true, rgbMode: "static", rgbColor: "#FF4655", rgbBrightness: 3 },
+  { id: "genshin", name: "Genshin Impact", processNames: ["GenshinImpact", "YuanShen"], profile: "performance", enabled: true, rgbMode: "breathing", rgbColor: "#00BFFF", rgbBrightness: 2 },
+  { id: "fortnite", name: "Fortnite", processNames: ["FortniteClient-Win64-Shipping"], profile: "turbo", enabled: true, rgbMode: "color-cycle", rgbBrightness: 3 },
+  { id: "valorant", name: "Valorant", processNames: ["VALORANT-Win64-Shipping"], profile: "turbo", enabled: true, rgbMode: "static", rgbColor: "#FF4655", rgbBrightness: 3, fanMode: "turbo" },
+  { id: "cod", name: "Call of Duty", processNames: ["cod", "ModernWarfare"], profile: "turbo", enabled: true, rgbMode: "strobe", rgbColor: "#FF0000", rgbBrightness: 3 },
+  { id: "apex", name: "Apex Legends", processNames: ["r5apex"], profile: "turbo", enabled: true, rgbMode: "static", rgbColor: "#FF0000", rgbBrightness: 3 },
+  { id: "lol", name: "League of Legends", processNames: ["League of Legends"], profile: "performance", enabled: true, rgbMode: "breathing", rgbColor: "#00D4FF", rgbBrightness: 2 },
+  { id: "obs", name: "OBS Studio", processNames: ["obs64"], profile: "performance", enabled: true, rgbMode: "static", rgbColor: "#FFFFFF", rgbBrightness: 1 },
+  { id: "premiere", name: "Adobe Premiere", processNames: ["Adobe Premiere Pro"], profile: "turbo", enabled: true, rgbMode: "static", rgbColor: "#9999FF", rgbBrightness: 1 },
+  { id: "davinci", name: "DaVinci Resolve", processNames: ["Resolve"], profile: "turbo", enabled: true, rgbMode: "static", rgbColor: "#FF8000", rgbBrightness: 2 },
+  { id: "blender", name: "Blender", processNames: ["blender"], profile: "turbo", enabled: true, rgbMode: "static", rgbColor: "#FF8000", rgbBrightness: 2 },
+  { id: "vscode", name: "VS Code (light)", processNames: ["Code"], profile: "silent", enabled: false, rgbMode: "breathing", rgbColor: "#007ACC", rgbBrightness: 1 },
 ];
 
 // ── PowerShell ───────────────────────────────────────────────
@@ -157,6 +163,71 @@ function getAllRules(): AutoRule[] {
   return [...BUILTIN_RULES, ...customRules];
 }
 
+// ── Linked Subsystem Control ─────────────────────────────────
+
+const AURA_REG_CANDIDATES = [
+  "HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\AuraService",
+  "HKLM:\\SOFTWARE\\ASUS\\AsRogAuraServiceSDK",
+  "HKLM:\\SOFTWARE\\ASUS\\AURA lighting effect add-on x64",
+] as const;
+
+async function applyRgb(rule: AutoRule): Promise<void> {
+  if (!rule.rgbMode) return;
+  const modeMap: Record<string, string> = { static: "0", breathing: "1", "color-cycle": "2", rainbow: "3", strobe: "4", off: "255" };
+  const modeVal = modeMap[rule.rgbMode] ?? "0";
+  const bright = rule.rgbBrightness ?? 3;
+  const colorHex = rule.rgbColor ?? "#FF0000";
+  const match = colorHex.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!match) return;
+  const [, rH, gH, bH] = match;
+  const r = parseInt(rH!, 16);
+  const g = parseInt(gH!, 16);
+  const b = parseInt(bH!, 16);
+
+  for (const regPath of AURA_REG_CANDIDATES) {
+    try {
+      await runPs(`
+$p = '${regPath}'
+Set-ItemProperty $p -Name LedMode -Value ${modeVal} -ErrorAction Stop
+Set-ItemProperty $p -Name LedColorR -Value ${r} -ErrorAction SilentlyContinue
+Set-ItemProperty $p -Name LedColorG -Value ${g} -ErrorAction SilentlyContinue
+Set-ItemProperty $p -Name LedColorB -Value ${b} -ErrorAction SilentlyContinue
+Set-ItemProperty $p -Name Brightness -Value ${bright} -ErrorAction SilentlyContinue
+`.trim());
+      return; // success on first working path
+    } catch {
+      // try next candidate
+    }
+  }
+}
+
+async function applyFanMode(rule: AutoRule): Promise<void> {
+  if (!rule.fanMode) return;
+  const fanMap: Record<string, string> = { auto: "0", silent: "1", turbo: "2" };
+  const val = fanMap[rule.fanMode];
+  if (val == null) return;
+  try {
+    await runPs(
+      `Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\FanControlPlugin' -Name FanScenario -Value ${val} -ErrorAction SilentlyContinue`,
+    );
+  } catch {
+    // silent fail
+  }
+}
+
+async function revertRgb(): Promise<void> {
+  for (const regPath of AURA_REG_CANDIDATES) {
+    try {
+      await runPs(
+        `Set-ItemProperty '${regPath}' -Name LedMode -Value 1 -ErrorAction Stop; Set-ItemProperty '${regPath}' -Name Brightness -Value 1 -ErrorAction SilentlyContinue`,
+      );
+      return;
+    } catch {
+      // try next
+    }
+  }
+}
+
 // ── Scan & Apply ─────────────────────────────────────────────
 
 async function scanAndApply(): Promise<string | null> {
@@ -169,7 +240,10 @@ async function scanAndApply(): Promise<string | null> {
       const ok = await setProfile(match.profile);
       if (ok) {
         lastAppliedRule = match.id;
-        return `[auto] ${match.name} detected → ${match.profile.toUpperCase()}`;
+        // Apply linked subsystems
+        await applyRgb(match);
+        await applyFanMode(match);
+        return `[auto] ${match.name} detected → ${match.profile.toUpperCase()}${match.rgbMode ? ` + RGB:${match.rgbMode}` : ""}${match.fanMode ? ` + Fan:${match.fanMode}` : ""}`;
       }
     } else {
       lastAppliedRule = match.id;
@@ -180,6 +254,7 @@ async function scanAndApply(): Promise<string | null> {
     if (current !== "silent") {
       await setProfile("silent");
     }
+    await revertRgb();
     lastAppliedRule = null;
   }
 
@@ -192,7 +267,11 @@ function formatRuleList(rules: AutoRule[]): string {
   const lines = rules.map((r) => {
     const status = r.enabled ? "ON" : "OFF";
     const procs = r.processNames.join(", ");
-    return `[${status}] ${r.name} → ${r.profile.toUpperCase()}\n      Detects: ${procs}`;
+    const extras: string[] = [];
+    if (r.rgbMode) extras.push(`RGB:${r.rgbMode}${r.rgbColor ? ` ${r.rgbColor}` : ""}`);
+    if (r.fanMode) extras.push(`Fan:${r.fanMode}`);
+    const extrasStr = extras.length > 0 ? `\n      Linked: ${extras.join(", ")}` : "";
+    return `[${status}] ${r.name} → ${r.profile.toUpperCase()}\n      Detects: ${procs}${extrasStr}`;
   });
   return `Automation Rules (${rules.length}):\n\n${lines.join("\n\n")}`;
 }

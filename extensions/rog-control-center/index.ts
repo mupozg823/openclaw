@@ -306,6 +306,69 @@ function formatPresets(): string {
   return lines.join("\n");
 }
 
+// ── Preset Application ──────────────────────────────────────
+
+const PRESET_POWER_MAP: Record<string, string> = { silent: "0", performance: "1", turbo: "2" };
+const PRESET_AURA_MAP: Record<string, string> = { static: "0", breathing: "1", "color-cycle": "2", rainbow: "3", strobe: "4", off: "255" };
+const PRESET_AURA_REG_CANDIDATES = [
+  "HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\AuraService",
+  "HKLM:\\SOFTWARE\\ASUS\\AsRogAuraServiceSDK",
+  "HKLM:\\SOFTWARE\\ASUS\\AURA lighting effect add-on x64",
+] as const;
+
+async function applyPreset(cfg: PresetConfig): Promise<string> {
+  const results: string[] = [];
+
+  // 1. Power profile
+  const pmVal = PRESET_POWER_MAP[cfg.powerProfile];
+  if (pmVal) {
+    try {
+      await runPs(
+        `Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\ThrottlePlugin\\ROG ATKStatus' -Name PowerMode -Value ${pmVal} -ErrorAction Stop`,
+      );
+      results.push(`[OK] Power → ${cfg.powerProfile.toUpperCase()}`);
+    } catch {
+      results.push(`[--] Power → failed (admin required?)`);
+    }
+  }
+
+  // 2. Fan mode
+  const fanMap: Record<string, string> = { auto: "0", silent: "1", turbo: "2" };
+  const fanVal = fanMap[cfg.fanMode];
+  if (fanVal) {
+    try {
+      await runPs(
+        `Set-ItemProperty 'HKLM:\\SOFTWARE\\ASUS\\ARMOURY CRATE Service\\FanControlPlugin' -Name FanScenario -Value ${fanVal} -ErrorAction SilentlyContinue`,
+      );
+      results.push(`[OK] Fan → ${cfg.fanMode}`);
+    } catch {
+      results.push(`[--] Fan → failed`);
+    }
+  }
+
+  // 3. RGB
+  const auraVal = PRESET_AURA_MAP[cfg.rgbMode];
+  if (auraVal) {
+    let rgbOk = false;
+    for (const regPath of PRESET_AURA_REG_CANDIDATES) {
+      try {
+        await runPs(`
+$p = '${regPath}'
+Set-ItemProperty $p -Name LedMode -Value ${auraVal} -ErrorAction Stop
+Set-ItemProperty $p -Name Brightness -Value ${cfg.rgbBrightness} -ErrorAction SilentlyContinue
+`.trim());
+        rgbOk = true;
+        break;
+      } catch {
+        // try next
+      }
+    }
+    results.push(rgbOk ? `[OK] RGB → ${cfg.rgbMode} (brightness ${cfg.rgbBrightness})` : `[--] RGB → registry not found`);
+  }
+
+  return `Apply results:\n  ${results.join("\n  ")}`;
+}
+
 function formatPresetApplied(preset: QuickPreset, cfg: PresetConfig): string {
   return [
     `Preset applied: ${cfg.name}`,
@@ -372,7 +435,7 @@ export default definePluginEntry({
           return { text: formatStatus(status) };
         }
 
-        if (action === "preset") {
+        if (action === "preset" || action === "apply") {
           const presetKey = tokens[1]?.toLowerCase() as QuickPreset | undefined;
           if (!presetKey) {
             return { text: "Usage: /cc preset <gaming|battery|quiet|presentation>\n\n" + formatPresets() };
@@ -383,7 +446,8 @@ export default definePluginEntry({
               text: `Unknown preset: "${presetKey}"\n\nAvailable: ${Object.keys(PRESETS).join(", ")}`,
             };
           }
-          return { text: formatPresetApplied(presetKey, cfg) };
+          const results = await applyPreset(cfg);
+          return { text: `${formatPresetApplied(presetKey, cfg)}\n\n${results}` };
         }
 
         if (action === "presets") {
